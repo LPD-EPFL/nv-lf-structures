@@ -1,6 +1,6 @@
 Concurrent lock-free data structures for non-volatile RAM
 
-/Not yet completely ported to Linux!/
+*Not yet completely ported to Linux!*
 
 Dependencies:
 * nvml (https://github.com/pmem/nvml)
