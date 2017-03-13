@@ -36,7 +36,7 @@
 #define DS_IS_REACHABLE(s,a) is_reachable(s,a)
 #define DS_RECOVER(s,p,n) recover(s,p,n)
 
-#define DS_TYPE             node_t
+#define DS_TYPE             skiplist_t
 #define DS_NODE             node_t
 #define DS_KEY              skey_t
 
@@ -103,7 +103,6 @@ test(void* thread)
   uint32_t ID = td->id;
   linkcache_t * lc = td->lc;
   set_cpu(ID);
-  ssalloc_init();
   //DS_LOCAL();
 
   DS_TYPE* set = td->set;
@@ -135,7 +134,7 @@ test(void* thread)
   seeds = seed_rand();
     
     EpochThread epoch = EpochThreadInit();
-	info->page_buffer = (page_buffer_t*)GetOpaquePageBuffer(epoch);
+	td->page_table = (active_page_table_t*)GetOpaquePageBuffer(epoch);
 
   barrier_cross(&barrier);
 
@@ -160,7 +159,7 @@ test(void* thread)
     {
       key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
       
-      if(DS_ADD(set,key,key,epch,lc) == 0)
+      if(DS_ADD(set,key,key,epoch,lc) == 0)
 	{
 	  i--;
 	}
@@ -226,7 +225,6 @@ int
 main(int argc, char **argv) 
 {
   set_cpu(0);
-  ssalloc_init();
   seeds = seed_rand();
 
   struct option long_options[] = {
@@ -261,7 +259,7 @@ main(int argc, char **argv)
 	  /* Flag is automatically set */
 	  break;
 	case 'h':
-	  printf("ASCYLIB -- stress test "
+	  printf("nv-lf-structures -- stress test "
 		 "\n"
 		 "\n"
 		 "Usage:\n"
@@ -385,7 +383,7 @@ main(int argc, char **argv)
   stop = 0;
 
 
-	linkcahe_t* lc = cache_create();
+	linkcache_t* lc = cache_create();
 	EpochGlobalInit(lc);
 
     EpochThread epoch = EpochThreadInit();

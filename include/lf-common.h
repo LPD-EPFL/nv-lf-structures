@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 #include <nv_utils.h>
-#include <linkcache.h>
+#include <link-cache.h>
 
 #include "utils.h"
 
@@ -24,7 +24,7 @@ inline void flush_and_try_unflag(PVOID* target) {
 	PVOID value = *target;
 	if (is_marked_ptr_cache((UINT_PTR)value)) {
 		write_data_wait(target, 1);
-		CAS_PTR((volatile PVOID*)target, value, (PVOID)unmark_ptr_buffer((UINT_PTR)value));
+		UNUSED PVOID dummy = CAS_PTR((volatile PVOID*)target, value, (PVOID)unmark_ptr_cache((UINT_PTR)value));
 	}
 }
 
@@ -34,14 +34,14 @@ inline void flush_and_try_unflag(PVOID* target) {
 inline PVOID link_and_persist(PVOID* target, PVOID oldvalue, PVOID value) {
 	//return InterlockedCompareExchangePointer(target, (PVOID)(UINT_PTR)value, (PVOID)oldvalue);
 	PVOID res;
-	res = CAS_PTR(target, (PVOID) oldvalue, (PVOID)mark_ptr_buffer((UINT_PTR)value));
+	res = CAS_PTR(target, (PVOID) oldvalue, (PVOID)mark_ptr_cache((UINT_PTR)value));
 	
 	//if cas successful, we updated the link, but it still needs flushing
 	if (res != oldvalue) {
 		return res; //nothing gets fluhed
 	}
 	write_data_wait(target, 1);
-	CAS_PTR((volatile PVOID*)target, (PVOID)mark_ptr_buffer((UINT_PTR)value),(PVOID)value);
+	UNUSED PVOID dummy = CAS_PTR((volatile PVOID*)target, (PVOID)mark_ptr_cache((UINT_PTR)value),(PVOID)value);
 	return res;
 }
 

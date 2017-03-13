@@ -587,7 +587,6 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 	size_t num_entries;
 	size_t page_size;
 	size_t nodes_per_page;
-    size_t crt_page;
 
 	page_descriptor_t* crt;
     size_t num_pages;
@@ -619,6 +618,6 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
                 }
             }
         }
-        destroy_page_buffer(page_buffers[i]);
+        destroy_active_page_table(page_buffers[i]);
         }
 }

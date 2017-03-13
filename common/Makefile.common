@@ -167,7 +167,7 @@ CFLAGS += -I$(JEMALLOC_PATH)/include
 
 LDFLAGS += -L${JEMALLOC_PATH}/lib -Wl,-rpath,${JEMALLOC_PATH}/lib -ljemalloc
 LDFLAGS += -L${NVRAM_PATH}/lib -lnvram
-LDFLAGS += -L${NVML_PATH}/lib -lmem -lpmemobj
+LDFLAGS += -L${NVML_PATH}/lib -lpmem -lpmemobj
 LDFLAGS += -L${ROOT}/external/lib 
 
 #################################

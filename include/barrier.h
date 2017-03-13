@@ -5,6 +5,8 @@
  * BARRIER
  * ################################################################### */
 
+#include <pthread.h>
+
 typedef struct barrier 
 {
   pthread_cond_t complete;

@@ -42,7 +42,6 @@
 #include <nv_utils.h>
 #include "random.h"
 #include "measurements.h"
-#include "ssalloc.h"
 #include "atomic_ops_if.h"
 
 #ifdef __cplusplus

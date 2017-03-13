@@ -27,8 +27,8 @@
 #include <malloc.h>
 #include <stdio.h>
 #include "measurements.h"
+#include "latency.h"
 #include "atomic_ops_if.h"
-#include "ssalloc.h"
 
 #define LOCAL_RAND
 
@@ -52,7 +52,6 @@ static inline unsigned long*
 seed_rand() 
 {
   unsigned long* seeds;
-  /* seeds = (unsigned long*) ssalloc_aligned(64, 64); */
   seeds = (unsigned long*) memalign(64, 64);
   seeds[0] = getticks() % 123456789;
   seeds[1] = getticks() % 362436069;
@@ -239,7 +238,7 @@ zipf_get_rand_array(double zipf_alpha,
     }
 
 
-  struct zipf_arr* za = malloc(sizeof(struct zipf_arr) + num_vals * sizeof(int));
+  struct zipf_arr* za = (struct zipf_arr*)malloc(sizeof(struct zipf_arr) + num_vals * sizeof(int));
   assert(za != NULL);
   za->size = num_vals;
   za->max = max;

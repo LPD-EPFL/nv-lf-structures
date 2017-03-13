@@ -1,9 +1,6 @@
 #ifndef _LF_SKIPLIST_H_
 #define _LF_SKIPLIST_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 /*
 	lock-free skip-list algorithm
 */
@@ -13,8 +10,11 @@ extern "C" {
 #include <nv_memory.h>
 #include <nv_utils.h>
 #include <epoch.h>
+#include "common.h"
 #include "random.h"
 #include "lf-common.h"
+
+#define CACHE_LINES_PER_NV_NODE 2 //TODO does nv-jemalloc need to be aware of this?
 
 #define max_level ((CACHE_LINES_PER_NV_NODE * 8) - 3) //one cache-line node; use 13 for two cache-line nodes
 
@@ -51,8 +51,5 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 
 int skiplist_size(skiplist_t* sl);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif

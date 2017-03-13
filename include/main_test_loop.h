@@ -116,7 +116,7 @@
     {									\
       int res;								\
       START_TS(0);							\
-      res = (sval_t) DS_CONTAINS(set, key, epoch, lc);			\
+      res = (svalue_t) DS_CONTAINS(set, key, epoch, lc);			\
       if(res != 0)							\
 	{								\
 	  END_TS(0, my_getting_count_succ);				\
@@ -168,7 +168,7 @@
     {									\
       int res;								\
       START_TS(0);							\
-      res = (sval_t) DS_CONTAINS(set, key, epoch, lc);			\
+      res = (svalue_t) DS_CONTAINS(set, key, epoch, lc);			\
       if(res != 0)							\
 	{								\
 	  END_TS(0, my_getting_count_succ);				\
@@ -261,7 +261,7 @@
 					       {			\
 						 int res;		\
 						 START_TS(0);		\
-						 res = (sval_t) DS_CONTAINS(set, key, epoch, lc); \
+						 res = (svalue_t) DS_CONTAINS(set, key, epoch, lc); \
 						 if(res != 0)		\
 						   {			\
 						     END_TS(0, my_getting_count_succ); \
