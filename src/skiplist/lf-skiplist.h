@@ -1,11 +1,15 @@
-#pragma once
+#ifndef _LF_SKIPLIST_H_
+#define _LF_SKIPLIST_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*
 	lock-free skip-list algorithm
 */
 
-//#include "lf-common.h"
-//#include "FlushBuffer_one_cl.h"
-
+#include <link-cache.h>
+#include "lf-common.h"
 
 #define max_level ((CACHE_LINES_PER_NV_NODE * 8) - 3) //one cache-line node; use 13 for two cache-line nodes
 
@@ -42,3 +46,8 @@ void recover(skiplist_t* sl, page_buffer_t** page_buffers, int num_page_buffers)
 
 int skiplist_size(skiplist_t* sl);
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif

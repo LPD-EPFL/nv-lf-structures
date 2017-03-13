@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _LF_COMMON_H_
+#define _LF_COMMON_H_
 
 typedef UINT64 skey_t;
 typedef UINT64 svalue_t;
@@ -37,3 +38,5 @@ inline PVOID link_and_persist(PVOID* target, PVOID oldvalue, PVOID value) {
 	InterlockedCompareExchangePointer((volatile PVOID*)target, (PVOID)value, (PVOID)mark_ptr_buffer((UINT_PTR)value));
 	return res;
 }
+
+#endif
