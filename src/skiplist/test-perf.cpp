@@ -137,7 +137,6 @@ test(void* thread)
     EpochThread epoch = EpochThreadInit();
 	info->page_buffer = (page_buffer_t*)GetOpaquePageBuffer(epoch);
 
-  RR_INIT(phys_id);
   barrier_cross(&barrier);
 
   DS_KEY key;
@@ -179,7 +178,6 @@ test(void* thread)
 
   barrier_cross(&barrier_global);
 
-  RR_START_SIMPLE();
 
   while (stop == 0) 
     {
@@ -187,7 +185,6 @@ test(void* thread)
     }
 
   barrier_cross(&barrier);
-  RR_STOP_SIMPLE();
 
   if (!ID)
     {
@@ -559,8 +556,6 @@ main(int argc, char **argv)
   printf("#txs %zu\t(%-10.0f\n", num_threads, throughput);
   printf("#Mops %.3f\n", throughput / 1e6);
 
-  RR_PRINT_UNPROTECTED(RAPL_PRINT_POW);
-  RR_PRINT_CORRECTED();    
   RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
     
 

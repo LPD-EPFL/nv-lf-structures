@@ -277,55 +277,5 @@
 
 #define POW_CORRECTED 0
 
-//  double pow_tot_correction = (throughput * eng_per_test_iter_nj[num_threads-1][0]) / 1e9;
-//   printf("#Duration: %f, %f, %f\n", s.duration[0], s.duration[1], s.duration[2]);
-
-
-#if RAPL_READ_ENABLE == 1
-#  if POW_CORRECTED == 1
-#    define RR_PRINT_CORRECTED()					\
-  rapl_stats_t s;							\
-  RR_STATS(&s);								\
-  if (num_threads > (CORES_PER_SOCKET*NUMBER_OF_SOCKETS))		\
-    {									\
-      num_threads = (CORES_PER_SOCKET*NUMBER_OF_SOCKETS);		\
-    }									\
-  double static_pow = 0;						\
-  int si;								\
-  for (si = 0; si < NUMBER_OF_SOCKETS; si++)				\
-    {									\
-      if (s.power_total[si] > 0)					\
-	{								\
-	  static_pow += static_power[si + 1];				\
-	}								\
-    }									\
-  double pow_tot_corrected = s.power_total[NUMBER_OF_SOCKETS] - static_pow; \
-  printf("#Total Power Corrected                     : %11f (correction= %10f) W\n", \
-	 pow_tot_corrected, static_pow);				\
-  double eop = (1e6 * s.power_total[NUMBER_OF_SOCKETS]) / throughput;	\
-  double eop_corrected = (1e6 * pow_tot_corrected) / throughput;	\
-  printf("#Energy per Operation                      : %11f (corrected = %10f) uJ\n", eop, eop_corrected);
-#  else	 /* not corrected */
-#    define RR_PRINT_CORRECTED()					\
-  rapl_stats_t s;							\
-  RR_STATS(&s);								\
-  if (num_threads > (CORES_PER_SOCKET*NUMBER_OF_SOCKETS))		\
-    {									\
-      num_threads = (CORES_PER_SOCKET*NUMBER_OF_SOCKETS);		\
-    }									\
-  double pow_tot_corrected = s.power_total[NUMBER_OF_SOCKETS];		\
-  printf("#Total Power Corrected                     : %11f (correction= %10f) W\n",  pow_tot_corrected, 0.0); \
-  double eop = (1e6 * s.power_total[NUMBER_OF_SOCKETS]) / throughput;	\
-  double eop_corrected = eop;						\
-  printf("#Energy per Operation                      : %11f (corrected = %10f) uJ\n", eop, eop_corrected);
-#  endif
-/* double pow_tot_corrected = s.power_total[NUMBER_OF_SOCKETS] - pow_tot_correction - static_pow; \ */
-
-
-#else
-#  define RR_PRINT_CORRECTED()
-#endif    
-
-
 
 #endif	/* _MAIN_TEST_LOOP_H_ */
