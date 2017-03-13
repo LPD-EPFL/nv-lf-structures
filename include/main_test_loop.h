@@ -86,7 +86,7 @@
     {									\
       int res;								\
       START_TS(1);							\
-      res = DS_ADD(set, key, algo_type);				\
+      res = DS_ADD(set, key, key, epoch, lc);				\
       if(res)								\
 	{								\
 	  END_TS(1, my_putting_count_succ);				\
@@ -101,7 +101,7 @@
     {									\
       int removed;							\
       START_TS(2);							\
-      removed = DS_REMOVE(set, key, algo_type);				\
+      removed = DS_REMOVE(set, key, epoch, lc);				\
       if(removed != 0)							\
 	{								\
 	  END_TS(2, my_removing_count_succ);				\
@@ -116,7 +116,7 @@
     {									\
       int res;								\
       START_TS(0);							\
-      res = (sval_t) DS_CONTAINS(set, key, algo_type);			\
+      res = (sval_t) DS_CONTAINS(set, key, epoch, lc);			\
       if(res != 0)							\
 	{								\
 	  END_TS(0, my_getting_count_succ);				\
@@ -138,7 +138,7 @@
     {									\
       int res;								\
       START_TS(1);							\
-      res = DS_ADD(set, key, algo_type);				\
+      res = DS_ADD(set, key, key, epoch, lc);				\
       if(res)								\
 	{								\
 	  END_TS(1, my_putting_count_succ);				\
@@ -153,7 +153,7 @@
     {									\
       int removed;							\
       START_TS(2);							\
-      removed = DS_REMOVE(set, key, algo_type);				\
+      removed = DS_REMOVE(set, key, epoch, lc);				\
       if(removed != 0)							\
 	{								\
 	  END_TS(2, my_removing_count_succ);				\
@@ -168,7 +168,7 @@
     {									\
       int res;								\
       START_TS(0);							\
-      res = (sval_t) DS_CONTAINS(set, key, algo_type);			\
+      res = (sval_t) DS_CONTAINS(set, key, epoch, lc);			\
       if(res != 0)							\
 	{								\
 	  END_TS(0, my_getting_count_succ);				\
@@ -187,7 +187,7 @@
       key = (c & rand_max) + rand_min;					\
       int res;								\
       START_TS(1);							\
-      res = DS_ADD(set, key, key);					\
+      res = DS_ADD(set, key, key, epoch, lc);					\
       if(res)								\
 	{								\
 	  END_TS(1, my_putting_count_succ);				\
@@ -202,7 +202,7 @@
     {									\
       int removed;							\
       START_TS(2);							\
-      removed = DS_REMOVE(set);						\
+      removed = DS_REMOVE(set, key, epoch, lc);						\
       if(removed != 0)							\
 	{								\
 	  END_TS(2, my_removing_count_succ);				\
@@ -231,7 +231,7 @@
 					       {			\
 						 int res;		\
 						 START_TS(1);		\
-						 res = DS_ADD(set, key, algo_type); \
+						 res = DS_ADD(set, key, key, epoch, lc); \
 						 if(res)		\
 						   {			\
 						     END_TS(1, my_putting_count_succ); \
@@ -246,7 +246,7 @@
 					       {			\
 						 int removed;		\
 						 START_TS(2);		\
-						 removed = DS_REMOVE(set, key, algo_type); \
+						 removed = DS_REMOVE(set, key, epoch, lc); \
 						 if(removed != 0)	\
 						   {			\
 						     END_TS(2, my_removing_count_succ);	\
@@ -261,7 +261,7 @@
 					       {			\
 						 int res;		\
 						 START_TS(0);		\
-						 res = (sval_t) DS_CONTAINS(set, key, algo_type); \
+						 res = (sval_t) DS_CONTAINS(set, key, epoch, lc); \
 						 if(res != 0)		\
 						   {			\
 						     END_TS(0, my_getting_count_succ); \
