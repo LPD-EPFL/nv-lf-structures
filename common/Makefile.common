@@ -1,0 +1,306 @@
+################
+# Local settings
+################
+
+# Compiler
+CC = g++
+
+VERSION         ?= O3
+ifeq ($(VERSION),DEBUG)
+	CFLAGS	+= -g -DDEBUG -O0
+endif
+ifeq ($(VERSION),SYMBOL)
+	CFLAGS	+= -O3 -g
+endif
+ifeq ($(VERSION),O0)
+	CFLAGS	+= -O0
+endif
+ifeq ($(VERSION),O1)
+	CFLAGS	+= -O1
+endif
+ifeq ($(VERSION),O2)
+	CFLAGS	+= -O2
+endif
+ifeq ($(VERSION),O3)
+	CFLAGS	+= -O3
+endif
+
+CFLAGS += -D_GNU_SOURCE
+
+ROOT 		?= ../..
+BINDIR		?= $(ROOT)/bin
+BUILDIR		?= $(ROOT)/build
+
+$(shell [ -d "$(BUILDIR)" ] || mkdir -p $(BUILDIR))
+$(shell [ -d "$(BINDIR)" ] || mkdir -p $(BINDIR))
+
+ifeq ($(LOCK),)
+  LOCK          ?= TAS
+endif
+
+#############################
+# Platform dependent settings
+#############################
+#
+# GCC thread-local storage requires "significant 
+# support from the linker (ld), dynamic linker
+# (ld.so), and system libraries (libc.so and libpthread.so), so it is
+# not available everywhere." source: GCC-doc.
+#
+# pthread_spinlock is replaced by pthread_mutex 
+# on MacOS X, as it might not be supported. 
+# Comment LOCK = MUTEX below to enable.
+
+ifndef OS_NAME
+    OS_NAME = $(shell uname -s)
+endif
+
+ifeq ($(OS_NAME), Darwin)
+    OS = MacOS
+    DEFINES += -UTLS
+    LOCK = MUTEX
+endif
+
+ifeq ($(OS_NAME), Linux)
+    OS = Linux
+    DEFINES += -DTLS
+endif
+
+ifeq ($(OS_NAME), SunOS)
+    OS = Solaris
+    CC = $(SOLARIS_CC1)
+    DEFINES += -DTLS
+endif
+
+ifndef STM
+    CFLAGS += -D$(LOCK)
+endif
+
+#################################
+# Management PC specific settings
+#################################
+
+ifndef PC_NAME
+	PC_NAME = $(shell uname -n)
+endif
+
+ifeq ($(PC_NAME), parsasrv1.epfl.ch)
+    PLATFORM_KNOWN = 1
+    OS = Linux
+    CC = $(TILERA_CC)
+    LDFLAGS += -ltmc
+    PLATFORM_NUMA = 1
+    ARCH = tile
+    ARCH_NAME = tile
+endif
+
+ifeq ($(PC_NAME), lpd48core)
+    PLATFORM_KNOWN = 1
+    CC = gcc-4.8
+    CFLAGS += -DOPTERON -DPLATFORM_MCORE 
+    PLATFORM_NUMA = 1
+endif
+ifeq ($(PC_NAME), lpdxeon2680)
+    PLATFORM_KNOWN = 1
+    CFLAGS += -DLPDXEON -DPLATFORM_MCORE
+    PLATFORM_NUMA = 1
+endif
+
+ifeq ($(PC_NAME), lpdquad)
+    PLATFORM_KNOWN = 1
+    CFLAGS += -DLPDQUAD -DPLATFORM_MCORE -DTSX_ENABLED -mrtm
+    PLATFORM_NUMA = 1
+endif
+
+ifeq ($(PC_NAME), lpdpc34)
+    PLATFORM_KNOWN = 1
+    CFLAGS += -DHASWELL -DTSX_ENABLED -mrtm
+    PLATFORM_NUMA = 0
+endif
+
+ifeq ($(PC_NAME), lpdpc4)
+    PLATFORM_KNOWN = 1
+    CFLAGS += -DLPDPC4
+    PLATFORM_NUMA = 0
+endif
+
+ifeq ($(PC_NAME), diassrv8)
+    PLATFORM_KNOWN = 1
+    CFLAGS += -DXEON -DPLATFORM_MCORE
+    PLATFORM_NUMA = 1
+endif
+
+ifeq ($(PC_NAME), maglite)
+    PLATFORM_KNOWN = 1
+    CC = $(SOLARIS_CC1)
+    CFLAGS += -DMAGLITE
+endif
+
+ifeq ($(PC_NAME), ol-collab1)
+    PLATFORM_KNOWN = 1
+ifdef LOCK
+    LOCK = TICKET
+endif
+    CC = $(SOLARIS_CC2)
+    CFLAGS += -DT44
+endif
+
+ifneq ($(PLATFORM_KNOWN), 1)
+    CFLAGS += -DDEFAULT
+    PLATFORM_NUMA = 0
+    CORE_NUM ?= $(shell nproc)
+    CORE_SPEED_KHz := $(shell cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)
+    FREQ_GHZ := $(shell echo "scale=3; ${CORE_SPEED_KHz}/1000000" | bc -l)
+    $(info ********************************** Using as a default number of cores: $(CORE_NUM) on 1 socket)
+    $(info ********************************** Using as a default frequency      : $(FREQ_GHZ) GHz)
+    $(info ********************************** If incorrect, create a manual entry in common/Makefile.common)
+    CFLAGS += -DCORE_NUM=${CORE_NUM}
+    CFLAGS += -DFREQ_GHZ=${FREQ_GHZ}
+endif
+
+
+CFLAGS += -I$(NVRAM_PATH)/include/libnvram
+CFLAGS += -I$(NVML_PATH)/include
+CFLAGS += -I$(JEMALLOC_PATH)/include
+
+LDFLAGS += -L${JEMALLOC_PATH}/lib -Wl,-rpath,${JEMALLOC_PATH}/lib -ljemalloc
+LDFLAGS += -L${NVRAM_PATH}/lib -lnvram
+LDFLAGS += -L${NVML_PATH}/lib -lmem -lpmemobj
+
+#################################
+# Architecture dependent settings
+#################################
+
+ifndef ARCH
+    ARCH_NAME = $(shell uname -m)
+endif
+
+ifeq ($(ARCH_NAME), i386)
+    ARCH = x86
+    CFLAGS += -m32
+    LDFLAGS += -m32
+    SSPFD = -lsspfd_x86
+    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_x86$(SSMEM_SUFFIX)
+endif
+
+ifeq ($(ARCH_NAME), i686)
+    ARCH = x86
+    CFLAGS += -m32
+    LDFLAGS += -m32
+    SSPFD = -lsspfd_x86
+    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_x86$(SSMEM_SUFFIX)
+endif
+
+ifeq ($(ARCH_NAME), x86_64)
+    ARCH = x86_64
+    CFLAGS += -m64
+    LDFLAGS += -m64
+    SSPFD = -lsspfd_x86_64
+    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_x86_64$(SSMEM_SUFFIX)
+endif
+
+ifeq ($(ARCH_NAME), sun4v)
+    ARCH = sparc64
+    CFLAGS += -DSPARC=1 -DINLINED=1 -m64
+    LDFLAGS += -lrt -m64
+    SSPFD = -lsspfd_sparc64
+    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_sparc64$(SSMEM_SUFFIX)
+endif
+
+ifeq ($(ARCH_NAME), tile)
+    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_tile$(SSMEM_SUFFIX)
+    SSPFD = -lsspfd_tile
+endif
+
+
+ifeq ($(PLATFORM_NUMA), 1)
+    LDFLAGS += -lnuma
+endif
+
+
+#################
+# Global settings
+#################
+
+CFLAGS += -Wall
+CFLAGS += -fno-strict-aliasing
+CFLAGS += -I$(LIBAO_INC) -I$(ROOT)/include -I$(LIBSSMEM)/include
+
+LDFLAGS += -lpthread -lrt -lm
+
+######################
+# compilation settings
+######################
+
+TEST_FILE = test-perf.cpp
+
+ifeq ($(LATENCY),1)
+	CFLAGS += -DCOMPUTE_LATENCY -DDO_TIMINGS
+endif
+
+ifeq ($(LATENCY),2)
+	CFLAGS += -DCOMPUTE_LATENCY -DDO_TIMINGS -DUSE_SSPFD -DLATENCY_ALL_CORES=0
+	LDFLAGS += $(SSPFD) -lm
+endif
+
+ifeq ($(LATENCY),3)
+	CFLAGS += -DCOMPUTE_LATENCY -DDO_TIMINGS -DUSE_SSPFD -DLATENCY_ALL_CORES=1
+	LDFLAGS += $(SSPFD) -lm
+endif
+
+ifeq ($(LATENCY),4)
+	CFLAGS += -DCOMPUTE_LATENCY -DDO_TIMINGS -DUSE_SSPFD -DLATENCY_PARSING=1
+	LDFLAGS += $(SSPFD) -lm
+endif
+
+ifeq ($(LATENCY),5)
+	CFLAGS += -DCOMPUTE_LATENCY -DDO_TIMINGS -DUSE_SSPFD -DLATENCY_PARSING=1 -DLATENCY_ALL_CORES=1
+	LDFLAGS += $(SSPFD) -lm
+endif
+
+ifeq ($(LATENCY),6)
+	CFLAGS += -DCOMPUTE_LATENCY -DDO_TIMINGS -DPFD_TYPE=2
+	LDFLAGS += $(SSPFD) -lm
+endif
+
+
+ifeq ($(INIT),all)
+	CFLAGS += -DINITIALIZE_FROM_ONE=0
+else
+	CFLAGS += -DINITIALIZE_FROM_ONE=1
+endif
+
+ifeq ($(SET_CPU),0)
+	CFLAGS += -DNO_SET_CPU
+endif
+
+ifeq ($(STATS),1)
+	CFLAGS += -DRETRY_STATS=1
+endif
+
+ifeq ($(STATS),2)
+	CFLAGS += -DOPS_PER_THREAD=1
+endif
+
+ifeq ($(STATS),3)
+	CFLAGS += -DRETRY_STATS=1 -DOPS_PER_THREAD=1
+endif
+
+ifeq ($(PAD),1)
+	CFLAGS += -DDO_PAD=1
+endif
+
+ifneq ($(WORKLOAD),)
+	CFLAGS += -DWORKLOAD=$(WORKLOAD)
+endif
+
+ifeq ($(WORKLOAD),2)
+    $(info ***************************************************************)
+    $(info *** Notice: Skewed workload tests might take long.          ***)
+    $(info *** Initializing tests takes time proportional to the range ***)
+    $(info *** used for the test. Zipf random numbers are precomputed. ***)
+    $(info *** However, the generated numbers for each configuration.  ***)
+    $(info *** are cached in a per-thread file for subsequent runs.    ***)
+    $(info ***************************************************************)
+endif
+
