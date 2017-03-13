@@ -1,5 +1,4 @@
-#include <testutil\precomp.h>
-thread_local UtRandomGenerator rndgen;
+#include "lf-skiplist.h"
 
 static inline UINT_PTR unmarked_ptr(UINT_PTR p) {
 	return(p & ~(UINT_PTR)0x01);
@@ -30,7 +29,7 @@ int get_random_level() {
 	int level = 1;
 
 	for (i = 0; i < max_level - 1; i++) {
-		if (rndgen.Generate() & 0x10000000) { //TODO replace the mod with something else?
+		if (rand_range(101) < 50) { //TODO replace the mod with something else?
 			level++;
 		}
 		else {
@@ -40,7 +39,7 @@ int get_random_level() {
 	return level;
 }
 
-__callback void sl_finalize_node(void * node, void * context, void* tls) {
+void sl_finalize_node(void * node, void * context, void* tls) {
 	EpochFreeNode(node);
 }
 
@@ -72,7 +71,7 @@ volatile node_t* new_node(skey_t key, svalue_t value, int height, EpochThread ep
 	for (int i = 0; i < max_level; i++) {
 		the_node->next[i] = NULL;
 	}
-	MemoryBarrier();
+    _mm_sfence();
 	return the_node;
 }
 
@@ -88,7 +87,7 @@ volatile node_t* new_node_and_set_next(skey_t key, svalue_t value, int height, v
 		the_node->next[i] = next;
 	}
 	write_data_wait((void*)the_node, CACHE_LINES_PER_NV_NODE);
-	MemoryBarrier();
+    _mm_sfence();
 	return the_node;
 }
 
@@ -112,7 +111,7 @@ int skiplist_size(skiplist_t* sl) {
 
 //search operation; retrieves predecessors and successors of the searched node; does cleanup if necessary - if the searched node is marked for removal, it is unlinked
 //for the pourposes of non-volatile memory, it is the level 0 unlink that is critical
-int sl_search(skiplist_t* sl, skey_t key, volatile node_t** left_nodes, volatile node_t** right_nodes, flushbuffer_t* buffer, EpochThread epoch) {
+int sl_search(skiplist_t* sl, skey_t key, volatile node_t** left_nodes, volatile node_t** right_nodes, linkcache_t* buffer, EpochThread epoch) {
 	int i;
 	volatile node_t *left;
 	volatile node_t* right = NULL;
@@ -146,13 +145,13 @@ retry:
 		}
 #ifdef BUFFERING_ON
 		if ((i == 0) && (buffer != NULL)) {
-			if ((left_next != right) && (buffer_try_link_and_add(buffer, key, (volatile void**) &(left->next[i]), left_next, right) == 0)) {
+			if ((left_next != right) && (cache_try_link_and_add(buffer, key, (volatile void**) &(left->next[i]), left_next, right) == 0)) {
 				goto retry;
 			}
 		}
 		else {
 			if ((left_next != right) &&
-				(InterlockedCompareExchangePointer((volatile PVOID*) &(left->next[i]), (PVOID)right, (PVOID)left_next)
+				(CAS_PTR((volatile PVOID*) &(left->next[i]), (PVOID)left_next, (PVOID)right)
 					!= left_next)) {
 				goto retry;
 			}
@@ -166,7 +165,7 @@ retry:
 			write_data_wait(&(left_next), 1);
 #endif
 			if ((left_next != right) &&
-				(InterlockedCompareExchangePointer((volatile PVOID*) &(left->next[i]), (PVOID)right, (PVOID)left_next)
+				(CAS_PTR((volatile PVOID*) &(left->next[i]), (PVOID)left_next, (PVOID)right)
 					!= left_next)) {
 				goto retry;
 			}
@@ -184,7 +183,7 @@ retry:
 
 /*#ifdef BUFFERING_ON
 		if ((i == 0) && (left_next != right)) {
-			buffer_add(buffer, key, (void*)&(left->next[0]));
+			cache_add(buffer, key, (void*)&(left->next[0]));
 		}
 #endif*/
 
@@ -259,7 +258,7 @@ int sl_search_no_cleanup_succs(skiplist_t* sl, skey_t key, volatile node_t** rig
 	return (right->key == key);
 }
 
-inline int mark_node_pointers( volatile node_t* node, flushbuffer_t* buffer) {
+inline int mark_node_pointers( volatile node_t* node, linkcache_t* buffer) {
 	int i;
 	int success = 0;
 	//fprintf(stderr, "in mark node ptrs\n");
@@ -273,7 +272,7 @@ inline int mark_node_pointers( volatile node_t* node, flushbuffer_t* buffer) {
 				success = 0;
 				break;
 			}
-			success = (InterlockedCompareExchangePointer((PVOID*)&node->next[i], MARKED_PTR(next_node), UNMARKED_PTR(next_node)) == UNMARKED_PTR(next_node)) ? 1: 0;
+			success = (CAS_PTR((PVOID*)&node->next[i], UNMARKED_PTR(next_node), MARKED_PTR(next_node)) == UNMARKED_PTR(next_node)) ? 1: 0;
 #ifdef SIMULATE_NAIVE_IMPLEMENTATION
 			write_data_wait((void*)(&node->next[i]), 1);
 #endif
@@ -288,12 +287,12 @@ inline int mark_node_pointers( volatile node_t* node, flushbuffer_t* buffer) {
 		}
 #ifdef BUFFERING_ON
 		if (buffer != NULL) {
-			success = buffer_try_link_and_add(buffer, node->key, (volatile void**)&node->next[0], UNMARKED_PTR(next_node), MARKED_PTR(next_node));
+			success = cache_try_link_and_add(buffer, node->key, (volatile void**)&node->next[0], UNMARKED_PTR(next_node), MARKED_PTR(next_node));
 			//node logically deleted at this point (i.e., searches for key will retrun false; need to make sure if this is the case it will appear so after recovery too - hence the addition of the link to the buffer)
 		}
 		else {
 			//buffer is null when recovering
-			success = (InterlockedCompareExchangePointer((PVOID*)&node->next[0], MARKED_PTR(next_node), UNMARKED_PTR(next_node)) == UNMARKED_PTR(next_node)) ? 1 : 0;
+			success = (CAS_PTR((PVOID*)&node->next[0],  UNMARKED_PTR(next_node), MARKED_PTR(next_node)) == UNMARKED_PTR(next_node)) ? 1 : 0;
 			if (success) {
 				write_data_wait((void*)&(node->next[0]), 1);
 			}
@@ -305,7 +304,7 @@ inline int mark_node_pointers( volatile node_t* node, flushbuffer_t* buffer) {
 	return success;
 }
 
-svalue_t skiplist_remove(skiplist_t* sl, skey_t key, EpochThread epoch, flushbuffer_t* buffer) {
+svalue_t skiplist_remove(skiplist_t* sl, skey_t key, EpochThread epoch, linkcache_t* buffer) {
 	volatile node_t* successors[max_level];
 	svalue_t result = 0;
 
@@ -316,7 +315,7 @@ svalue_t skiplist_remove(skiplist_t* sl, skey_t key, EpochThread epoch, flushbuf
 	//fprintf(stderr, "in rmove 2\n");
 	if (!found) {
 #ifdef BUFFERING_ON
-		buffer_scan(buffer, key);
+		cache_scan(buffer, key);
 #endif
 		EpochEnd(epoch);
 		return 0;
@@ -342,7 +341,7 @@ svalue_t skiplist_remove(skiplist_t* sl, skey_t key, EpochThread epoch, flushbuf
 
 }
 
-int skiplist_insert(skiplist_t* sl, skey_t key, svalue_t val, EpochThread epoch, flushbuffer_t* buffer) {
+int skiplist_insert(skiplist_t* sl, skey_t key, svalue_t val, EpochThread epoch, linkcache_t* buffer) {
 	volatile node_t* to_insert;
 	volatile node_t* pred;
 	volatile node_t* succ;
@@ -360,7 +359,7 @@ retry:
 	if (found) {
 #ifdef BUFFERING_ON
 		//need to make sure this is persisted
-		buffer_scan(buffer, key);
+		cache_scan(buffer, key);
 #else
 		flush_and_try_unflag((PVOID*)&(preds[0]->next));
 #endif
@@ -376,7 +375,7 @@ retry:
 	write_data_wait((void*)to_insert, CACHE_LINES_PER_NV_NODE); //we persist the newly allocated data in new_node; 
 
 #ifdef BUFFERING_ON
-	if (buffer_try_link_and_add(buffer, key,(volatile void**) &preds[0]->next[0], UNMARKED_PTR(succs[0]), to_insert) == 0) {
+	if (cache_try_link_and_add(buffer, key,(volatile void**) &preds[0]->next[0], UNMARKED_PTR(succs[0]), to_insert) == 0) {
 		sl_finalize_node((void*)to_insert, NULL, NULL);
 		goto retry;
 	}
@@ -385,7 +384,7 @@ retry:
 	//and the recovery procedure can handle links to nodes missing
 #else
 	if ((node_t*)link_and_persist((PVOID*)&(preds[0]->next[0]), (PVOID)UNMARKED_PTR(succs[0]), (PVOID)to_insert) != UNMARKED_PTR(succs[0])) {
-//if (InterlockedCompareExchangePointer((PVOID*)&preds[0]->next[0], (PVOID)to_insert, UNMARKED_PTR(succs[0])) != UNMARKED_PTR(succs[0])) {
+//if (CAS_PTR((PVOID*)&preds[0]->next[0], UNMARKED_PTR(succs[0]), (PVOID)to_insert) != UNMARKED_PTR(succs[0])) {
 	//failed to insert the node, so I can actually free it if I want 
 	//there's no chance anyone has a reference to it, right? so I can just call the finalize on it directly
 	//EpochReclaimObject(epoch, (void*) to_insert, NULL, NULL, finalize_node);
@@ -405,7 +404,7 @@ for (i = 1; i < to_insert->toplevel; i++) {
 			return 1;
 		}
 
-		if (InterlockedCompareExchangePointer((PVOID*)&pred->next[i], (PVOID)to_insert, (PVOID)succ) == succ) {
+		if (CAS_PTR((PVOID*)&pred->next[i], (PVOID) succ, (PVOID)to_insert) == succ) {
 #ifdef SIMULATE_NAIVE_IMPLEMENTATION
 			write_data_wait((void*)&(pred->next[i]), 1);
 #endif
@@ -419,7 +418,7 @@ return 1;
 }
 
 //simple search, no cleanup;
-static node_t* sl_left_search(skiplist_t* sl, skey_t key, flushbuffer_t* buffer) {
+static node_t* sl_left_search(skiplist_t* sl, skey_t key, linkcache_t* buffer) {
 	node_t * left = NULL;
 	volatile node_t* left_prev;
 
@@ -441,7 +440,7 @@ static node_t* sl_left_search(skiplist_t* sl, skey_t key, flushbuffer_t* buffer)
 #ifdef BUFFERING_ON
 	//even if key is not found, we still need to scan; a change deleting a node with the serached key might be buffered
 	if (buffer != NULL) {
-		buffer_scan(buffer, key);
+		cache_scan(buffer, key);
 	}
 #else
 	flush_and_try_unflag((PVOID*)&(left->next[0]));
@@ -449,7 +448,7 @@ static node_t* sl_left_search(skiplist_t* sl, skey_t key, flushbuffer_t* buffer)
 	return left;
 }
 
-svalue_t skiplist_find(skiplist_t* sl, skey_t key, EpochThread epoch, flushbuffer_t* buffer) {
+svalue_t skiplist_find(skiplist_t* sl, skey_t key, EpochThread epoch, linkcache_t* buffer) {
 
 	svalue_t result = 0;
 
@@ -492,7 +491,7 @@ int is_reachable(skiplist_t* sl, void* address) {
 }
 
 
-void recover(skiplist_t* sl, page_buffer_t** page_buffers, int num_page_buffers) {
+void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_buffers) {
 	node_t ** unlinking_address = (node_t**)EpochCacheAlignedAlloc(sizeof(node_t*));
 
 	volatile node_t* node = UNMARKED_PTR((*sl)->next[0]);
@@ -583,44 +582,43 @@ void recover(skiplist_t* sl, page_buffer_t** page_buffers, int num_page_buffers)
 
 	
 	// now go over all the pages in the page buffers and check which of the nodes there are reachable;
-	int j;
+	size_t j;
 	int k;
 	size_t num_entries;
 	size_t page_size;
 	size_t nodes_per_page;
+    size_t crt_page;
 
-	page_buffer_entry_t* crt;
+	page_descriptor_t* crt;
+    size_t num_pages;
 
-	for (i = 0; i < num_page_buffers; i++) {
-		page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
-		crt = page_buffers[i]->pages;
-		while (crt != NULL) {
-			num_entries = sizeof(crt->pages) / sizeof(page_descriptor_t);
-			for (j = 0; j < num_entries; j++) {
-				if (crt->pages[j].page != NULL) {
-					void * crt_address = crt->pages[j].page;
-					nodes_per_page = page_size / sizeof(node_t);
-					for (k = 0; k < nodes_per_page; k++) {
-						void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
-						if (!NodeMemoryIsFree(node_address)) {
-							if (!is_reachable(sl, node_address)) {
-								//if (NodeMemoryIsFree(node_address)) {
-									//this should never happen in this structure - since we remove marked nodes just before
-								//	fprintf(stderr, "error: reachable node whose memory was free\n");
-									//MarkNodeMemoryAsAllocated(node_address); //if a node is reachable but its memory is marked as free, need to mark that memory as allocated
-								//}
-							//}
-							//else {
-							//	if (!NodeMemoryIsFree(node_address)) {
-									MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
-							//	}
-							}
-						}
-					}
-				}
-			}
-			crt = crt->next;
-		}
-		destroy_page_buffer(page_buffers[i]);
-	}
+    for (i = 0; i < num_page_buffers; i++) {
+        page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
+        num_pages = page_buffers[i]->last_in_use + 1;
+        crt = page_buffers[i]->pages;
+        for (j = 0; j < num_pages; j++) {
+            if (crt[j].page != NULL) {
+                void * crt_address = crt[j].page;
+                nodes_per_page = page_size / sizeof(node_t);
+                for (k = 0; k < nodes_per_page; k++) {
+                    void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
+                    if (!NodeMemoryIsFree(node_address)) {
+                        if (!is_reachable(sl, node_address)) {
+                            //if (NodeMemoryIsFree(node_address)) {
+                            //this should never happen in this structure - since we remove marked nodes just before
+                            //	fprintf(stderr, "error: reachable node whose memory was free\n");
+                            //MarkNodeMemoryAsAllocated(node_address); //if a node is reachable but its memory is marked as free, need to mark that memory as allocated
+                            //}
+                            //}
+                            //else {
+                            //	if (!NodeMemoryIsFree(node_address)) {
+                            MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
+                        //	}
+                    }
+                    }
+                }
+            }
+        }
+        destroy_page_buffer(page_buffers[i]);
+        }
 }

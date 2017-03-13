@@ -158,6 +158,8 @@ ifneq ($(PLATFORM_KNOWN), 1)
     CFLAGS += -DFREQ_GHZ=${FREQ_GHZ}
 endif
 
+CFLAGS += -I$(ROOT)/include
+CFLAGS += -I$(ROOT)/external/include
 
 CFLAGS += -I$(NVRAM_PATH)/include/libnvram
 CFLAGS += -I$(NVML_PATH)/include
@@ -166,6 +168,7 @@ CFLAGS += -I$(JEMALLOC_PATH)/include
 LDFLAGS += -L${JEMALLOC_PATH}/lib -Wl,-rpath,${JEMALLOC_PATH}/lib -ljemalloc
 LDFLAGS += -L${NVRAM_PATH}/lib -lnvram
 LDFLAGS += -L${NVML_PATH}/lib -lmem -lpmemobj
+LDFLAGS += -L${ROOT}/external/lib 
 
 #################################
 # Architecture dependent settings
@@ -180,7 +183,6 @@ ifeq ($(ARCH_NAME), i386)
     CFLAGS += -m32
     LDFLAGS += -m32
     SSPFD = -lsspfd_x86
-    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_x86$(SSMEM_SUFFIX)
 endif
 
 ifeq ($(ARCH_NAME), i686)
@@ -188,7 +190,6 @@ ifeq ($(ARCH_NAME), i686)
     CFLAGS += -m32
     LDFLAGS += -m32
     SSPFD = -lsspfd_x86
-    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_x86$(SSMEM_SUFFIX)
 endif
 
 ifeq ($(ARCH_NAME), x86_64)
@@ -196,7 +197,6 @@ ifeq ($(ARCH_NAME), x86_64)
     CFLAGS += -m64
     LDFLAGS += -m64
     SSPFD = -lsspfd_x86_64
-    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_x86_64$(SSMEM_SUFFIX)
 endif
 
 ifeq ($(ARCH_NAME), sun4v)
@@ -204,7 +204,6 @@ ifeq ($(ARCH_NAME), sun4v)
     CFLAGS += -DSPARC=1 -DINLINED=1 -m64
     LDFLAGS += -lrt -m64
     SSPFD = -lsspfd_sparc64
-    LDFLAGS += -L$(LIBSSMEM)/lib -lssmem_sparc64$(SSMEM_SUFFIX)
 endif
 
 ifeq ($(ARCH_NAME), tile)
