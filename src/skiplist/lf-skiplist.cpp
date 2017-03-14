@@ -349,7 +349,7 @@ int skiplist_insert(skiplist_t* sl, skey_t key, svalue_t val, EpochThread epoch,
 	volatile node_t* succs[max_level];
 	volatile node_t* preds[max_level];
 
-	int i;
+	UINT32 i;
 	int found;
 
 	EpochStart(epoch);
@@ -583,8 +583,7 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 	
 	// now go over all the pages in the page buffers and check which of the nodes there are reachable;
 	size_t j;
-	int k;
-	size_t num_entries;
+	size_t k;
 	size_t page_size;
 	size_t nodes_per_page;
 

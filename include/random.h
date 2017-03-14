@@ -253,7 +253,7 @@ zipf_get_rand_array(double zipf_alpha,
       printf("--- [%-2d] Creating rand file with %zu vals\n", id, num_vals);
       rand_file = fopen(fname, "w+");
       int file_ok = (rand_file != NULL);
-      int i;
+      size_t i;
       for (i = 0; i < num_vals; i++)
 	{
 	  za->vals[i] = zipf(zipf_alpha, max);
@@ -265,7 +265,7 @@ zipf_get_rand_array(double zipf_alpha,
     }
   else
     {
-      int i;
+      size_t i;
       for (i = 0; i < num_vals; i++)
 	{
 	  int val;

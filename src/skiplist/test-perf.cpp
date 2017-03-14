@@ -139,13 +139,13 @@ test(void* thread)
   barrier_cross(&barrier);
 
   DS_KEY key;
-  int c = 0;
+  uint32_t c = 0;
   uint32_t scale_rem = (uint32_t) (update_rate * UINT_MAX);
   uint32_t scale_put = (uint32_t) (put_rate * UINT_MAX);
 
   int i;
   uint32_t num_elems_thread = (uint32_t) (initial / num_threads);
-  int32_t missing = (uint32_t) initial - (num_elems_thread * num_threads);
+  uint32_t missing = (uint32_t) initial - (num_elems_thread * num_threads);
   if (ID < missing)
     {
       num_elems_thread++;
@@ -155,7 +155,7 @@ test(void* thread)
   num_elems_thread = (ID == 0) * initial;
 #endif    
 
-  for(i = 0; i < num_elems_thread; i++) 
+  for(i = 0; i < (int64_t) num_elems_thread; i++) 
     {
       key = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (rand_max + 1)) + rand_min;
       
@@ -418,7 +418,7 @@ main(int argc, char **argv)
     
   thread_data_t* tds = (thread_data_t*) malloc(num_threads * sizeof(thread_data_t));
 
-  long t;
+  size_t t;
   for(t = 0; t < num_threads; t++)
     {
       tds[t].id = t;
@@ -557,7 +557,7 @@ main(int argc, char **argv)
   RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
     
 
-	printf("    Recovery takes (cycles): %u\n", recovery_cycles);
+	printf("    Recovery takes (cycles): %llu\n", (LLU)recovery_cycles);
 
     DS_DELETE(set);
 #ifdef ESTIMATE_RECOVERY
