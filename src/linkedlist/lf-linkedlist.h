@@ -13,6 +13,10 @@
 #include "random.h"
 #include "lf-common.h"
 
+#define NODE_PADDING 1
+
+#define CACHE_LINES_PER_NV_NODE 1 //TODO does nv-jemalloc need to be aware of this?
+
 typedef struct node_t {
     skey_t key;
     svalue_t value;

@@ -14,6 +14,8 @@
 #include "random.h"
 #include "lf-common.h"
 
+#define NODE_PADDING 1
+
 #define CACHE_LINES_PER_NV_NODE 2 //TODO does nv-jemalloc need to be aware of this?
 
 #define max_level ((CACHE_LINES_PER_NV_NODE * 8) - 3) //one cache-line node; use 13 for two cache-line nodes
