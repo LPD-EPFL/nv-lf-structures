@@ -32,7 +32,7 @@ inline void flush_and_try_unflag(PVOID* target) {
 //links a node and persists it
 //marks the link while it is doing the persist
 inline PVOID link_and_persist(PVOID* target, PVOID oldvalue, PVOID value) {
-	//return InterlockedCompareExchangePointer(target, (PVOID)(UINT_PTR)value, (PVOID)oldvalue);
+	//return CAS_PTR(target,oldvalue, value);
 	PVOID res;
 	res = CAS_PTR(target, (PVOID) oldvalue, (PVOID)mark_ptr_cache((UINT_PTR)value));
 	

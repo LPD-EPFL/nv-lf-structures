@@ -10,7 +10,7 @@ static inline UINT_PTR unmarked_ptr_all(UINT_PTR p) {
 	return(p & ~(UINT_PTR)0x03);
 }
 
-#define UNMARKED_PTR_ALL(p) (node_t*)unmarked_ptr((UINT_PTR) p)
+#define UNMARKED_PTR_ALL(p) (node_t*)unmarked_ptr_all((UINT_PTR) p)
 
 static inline UINT_PTR marked_ptr(UINT_PTR p) {
 	return (p | (UINT_PTR)0x01);
