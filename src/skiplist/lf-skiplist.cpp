@@ -592,7 +592,7 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 
     for (i = 0; i < num_page_buffers; i++) {
         page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
-        num_pages = page_buffers[i]->last_in_use + 1;
+        num_pages = page_buffers[i]->last_in_use;
         crt = page_buffers[i]->pages;
         for (j = 0; j < num_pages; j++) {
             if (crt[j].page != NULL) {

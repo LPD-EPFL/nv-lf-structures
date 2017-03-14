@@ -20,23 +20,23 @@
 
 #include <nv_utils.h>
 
-#include "lf-skiplist.h"
+#include "lf-linkedlist.h"
 
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,e,c)  skiplist_find(s,k,e,c)
-#define DS_ADD(s,k,v,e,c)     skiplist_insert(s, k,(k+4),e,c)
-#define DS_REMOVE(s, k, e, c)    skiplist_remove(s, k, e, c)
-#define DS_SIZE(s)          skiplist_size(s)
-#define DS_NEW(e)            new_skiplist(e)
-#define DS_DELETE(s)         delete_skiplist(s)
+#define DS_CONTAINS(s,k,e,c)  linkedlist_find(s,k,e,c)
+#define DS_ADD(s,k,v,e,c)     linkedlist_insert(s, k,(k+4),e,c)
+#define DS_REMOVE(s, k, e, c)    linkedlist_remove(s, k, e, c)
+#define DS_SIZE(s)          linkedlist_size(s)
+#define DS_NEW(e)            new_linkedlist(e)
+#define DS_DELETE(s)         delete_linkedlist(s)
 
 #define DS_IS_REACHABLE(s,a) is_reachable(s,a)
 #define DS_RECOVER(s,p,n) recover(s,p,n)
 
-#define DS_TYPE             skiplist_t
+#define DS_TYPE             linkedlist_t
 #define DS_NODE             node_t
 #define DS_KEY              skey_t
 
