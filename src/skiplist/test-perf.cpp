@@ -133,7 +133,7 @@ test(void* thread)
     
   seeds = seed_rand();
     
-    EpochThread epoch = EpochThreadInit();
+    EpochThread epoch = EpochThreadInit(ID);
 	td->page_table = (active_page_table_t*)GetOpaquePageBuffer(epoch);
 
   barrier_cross(&barrier);
@@ -215,6 +215,10 @@ test(void* thread)
       RETRY_STATS_SHARE();
     }
   EXEC_IN_DEC_ID_ORDER_END(&barrier);
+
+#ifndef ESTIMATE_RECOVERY
+  EpochThreadShutdown(epoch);
+#endif
 
   SSPFDTERM();
   THREAD_END();
@@ -386,7 +390,7 @@ main(int argc, char **argv)
 	linkcache_t* lc = cache_create();
 	EpochGlobalInit(lc);
 
-    EpochThread epoch = EpochThreadInit();
+    EpochThread epoch = EpochThreadInit(num_threads);
   DS_TYPE* set = DS_NEW(epoch);
   assert(set != NULL);
 
@@ -513,6 +517,8 @@ main(int argc, char **argv)
 	page_buffer_t* pb = create_page_buffer();
 
 	SetOpaquePageBuffer(epoch, pb);
+#else
+  EpochThreadShutdown(epoch);
 #endif
 
 #if defined(COMPUTE_LATENCY)
