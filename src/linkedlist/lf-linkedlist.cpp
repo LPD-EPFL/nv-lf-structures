@@ -62,6 +62,7 @@ volatile node_t* new_node_and_set_next(skey_t key, svalue_t value, volatile node
 	the_node = (node_t*)EpochAllocNode(epoch, sizeof(node_t));
 	the_node->key = key;
 	the_node->value = value;
+    next = (node_t*)unmark_ptr_cache((uintptr_t)(next));
 	the_node->next = next;
 	write_data_wait((void*)the_node, CACHE_LINES_PER_NV_NODE);
 	_mm_sfence();
@@ -70,6 +71,7 @@ volatile node_t* new_node_and_set_next(skey_t key, svalue_t value, volatile node
 
 static inline int delete_right(volatile node_t* left, volatile node_t* right, EpochThread epoch, linkcache_t* buffer) {
 	volatile node_t* nnext = UNMARKED_PTR(right->next);
+    nnext = (node_t*)unmark_ptr_cache((uintptr_t)(nnext));
 
 	EpochDeclareUnlinkNode(epoch, (void*)right, linkedlist_node_size);
 #ifdef BUFFERING_ON
@@ -107,7 +109,7 @@ static inline int delete_right(volatile node_t* left, volatile node_t* right, Ep
 
 static inline volatile node_t* search(linkedlist_t* ll, skey_t key, volatile node_t** left_ptr, EpochThread epoch, linkcache_t* buffer) {
 	volatile node_t* left = *ll;
-	volatile node_t* right = (*ll)->next;
+	volatile node_t* right = (node_t*)unmark_ptr_cache((uintptr_t)(*ll)->next);
 	while (1) {
 		if (!PTR_IS_MARKED(right->next)) {
 			if (right->key >= key) {
@@ -128,11 +130,15 @@ static inline volatile node_t* search(linkedlist_t* ll, skey_t key, volatile nod
 int linkedlist_size(linkedlist_t* ll) {
 	int size = 0;
 
-	volatile node_t* node = UNMARKED_PTR((*ll)->next);
+    flush_and_try_unflag((PVOID*)&((*ll)->next));
+	volatile node_t* node = (node_t*)unmark_ptr_cache((uintptr_t)(*ll)->next);
+	UNMARKED_PTR(node);
+
 	while (node->next != NULL) {
 		if (!PTR_IS_MARKED(node->next)) {
 			size++;
 		}
+        flush_and_try_unflag((PVOID*)&(node->next));
 		node = UNMARKED_PTR(node->next);
 	}
 
@@ -151,7 +157,7 @@ svalue_t linkedlist_remove(linkedlist_t* ll, skey_t key, EpochThread epoch, link
 
 		if (right->key != key) {
 #ifdef BUFFERING_ON
-			cache_scan(buffer, key);
+            cache_scan(buffer, key);
 #else
 			flush_and_try_unflag((PVOID*)&(left->next));
 #endif
@@ -163,10 +169,13 @@ svalue_t linkedlist_remove(linkedlist_t* ll, skey_t key, EpochThread epoch, link
 		node_t* marked = MARKED_PTR(unmarked);
 #ifdef BUFFERING_ON
 		if (buffer != NULL) {
-			int success = cache_try_link_and_add(buffer, right->key, (volatile void**)&right->next, unmarked, marked);
+			int success = cache_try_link_and_add(buffer, right->key, (volatile void**)&(right->next), unmarked, marked);
 			if (success) {
+                res = unmarked;
 				break;
-			}
+			} else {
+                res = marked;
+            }
 		} else {
 			//this branch taken on recovery, no need to care about concurrency
 			res = (node_t*)CAS_PTR((PVOID*)&(right->next), unmarked, marked);
@@ -216,7 +225,7 @@ int linkedlist_insert(linkedlist_t* ll, skey_t key, svalue_t val, EpochThread ep
 		volatile node_t* to_add = new_node_and_set_next(key, val, right, epoch);  //we persist the newly allocated data in new_node (done so in the call); 
 
 #ifdef BUFFERING_ON
-		if (cache_try_link_and_add(buffer, key, (volatile void**)&left->next, right, to_add)) {
+		if (cache_try_link_and_add(buffer, key, (volatile void**)&(left->next), right, to_add)) {
 			EpochEnd(epoch);
 			return 1;
 		}
@@ -238,7 +247,7 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 
 	EpochStart(epoch);
 	volatile node_t* prev = (*ll);
-	volatile node_t* node = (*ll)->next;
+	volatile node_t* node = (node_t*)unmark_ptr_cache((uintptr_t)(*ll)->next);
 	
 	while (node->key < key) {
 		prev = node;
@@ -248,7 +257,7 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 
 	if ((node->key == key) && (!PTR_IS_MARKED(node->next))) {
 #ifdef BUFFERING_ON
-		cache_scan(buffer, key);
+        cache_scan(buffer, key);
 #else
 		flush_and_try_unflag((PVOID*)&(prev->next));
 		flush_and_try_unflag((PVOID*)&(node->next));
@@ -257,7 +266,7 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 		return node->value;
 	}
 #ifdef BUFFERING_ON
-	cache_scan(buffer, key);
+    cache_scan(buffer, key);
 #else
 	flush_and_try_unflag((PVOID*)&(prev->next));
 	flush_and_try_unflag((PVOID*)&(node->next));

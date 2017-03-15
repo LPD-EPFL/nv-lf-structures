@@ -18,7 +18,6 @@
 #define CACHE_LINE_SIZE 64
 #define PMEM_CACHE_ALIGNED ALIGNED(CACHE_LINE_SIZE)
 
-
 inline void flush_and_try_unflag(PVOID* target) {
 	//return;
 	PVOID value = *target;
