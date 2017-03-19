@@ -394,7 +394,7 @@ retry:
 //write_data_wait((void*)&(preds[0]->next[0]), 1);
 #endif
 
-node_t* new_next;
+volatile node_t* new_next;
 
 for (i = 1; i < to_insert->toplevel; i++) {
 	while (1) {
