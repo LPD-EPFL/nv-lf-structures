@@ -53,13 +53,11 @@
 
 typedef uint8_t bool_t;
 
-extern __thread ssmem_allocator_t* alloc;
-
 typedef ALIGNED(64) struct node_t node_t;
 
 struct node_t{
     skey_t key;
-    sval_t value;
+    svalue_t value;
     volatile node_t* right;
     volatile node_t* left;
   uint8_t padding[32];
@@ -92,14 +90,14 @@ typedef ALIGNED(CACHE_LINE_SIZE) struct seek_record_t{
 
 //extern __thread seek_record_t* seek_record;
 
-node_t* initialize_tree();
+node_t* initialize_tree(EpochThread epoch);
 void bst_init_local();
-node_t* create_node(skey_t k, sval_t value, int initializing);
-seek_record_t * bst_seek(skey_t key, node_t* node_r);
-sval_t bst_search(skey_t key, node_t* node_r);
-bool_t bst_insert(skey_t key, sval_t val, node_t* node_r);
-sval_t bst_remove(skey_t key, node_t* node_r);
-bool_t bst_cleanup(skey_t key);
+node_t* create_node(skey_t k, svalue_t value, int initializing, EpochThread epoch);
+seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
+svalue_t bst_search(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
+bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
+svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
+bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer);
 uint32_t bst_size(volatile node_t* r);
 
 static inline uint64_t GETFLAG(volatile node_t* ptr) {

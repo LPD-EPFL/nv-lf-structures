@@ -26,17 +26,19 @@
  * Definition of macros: per data structure
  * ################################################################### */
 
-#define DS_CONTAINS(s,k,e,c)  bst_search(s,k,e,c)
-#define DS_ADD(s,k,v,e,c)     bst_insert(s, k,(k+4),e,c)
-#define DS_REMOVE(s, k, e, c)    bst_remove(s, k, e, c)
+#define DS_CONTAINS(s,k,e,c)  bst_search(k,s,e,c)
+#define DS_ADD(s,k,v,e,c)     bst_insert(k,(k+4),s,e,c)
+#define DS_REMOVE(s, k, e, c)    bst_remove(k, s, e, c)
 #define DS_SIZE(s)          bst_size(s)
-#define DS_NEW(e)            new_linkedlist(e)
-#define DS_DELETE(s)         delete_linkedlist(s)
+#define DS_NEW(e)            initialize_tree(e)
+// #define DS_DELETE(s)         delete_linkedlist(s)
+#define DS_LOCAL()          bst_init_local()
+
 
 #define DS_IS_REACHABLE(s,a) is_reachable(s,a)
 #define DS_RECOVER(s,p,n) recover(s,p,n)
 
-#define DS_TYPE             linkedlist_t
+#define DS_TYPE             node_t
 #define DS_NODE             node_t
 #define DS_KEY              skey_t
 
@@ -103,7 +105,7 @@ test(void* thread)
   uint32_t ID = td->id;
   linkcache_t * lc = td->lc;
   set_cpu(ID);
-  //DS_LOCAL();
+  DS_LOCAL();
 
   DS_TYPE* set = td->set;
 
@@ -565,7 +567,7 @@ main(int argc, char **argv)
 
     printf("    Recovery takes (cycles): %llu\n", (LLU)recovery_cycles);
 
-    DS_DELETE(set);
+    // DS_DEL ETE(set);
 #ifdef ESTIMATE_RECOVERY
     destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
 #endif
