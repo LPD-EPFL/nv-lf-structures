@@ -105,7 +105,7 @@ static inline uint64_t GETFLAG(volatile node_t* ptr) {
 }
 
 static inline uint64_t GETTAG(volatile node_t* ptr) {
-    return ((uint64_t)ptr) & 2;
+    return ((uint64_t)ptr) & 4;
 }
 
 static inline uint64_t FLAG(node_t* ptr) {
@@ -113,11 +113,11 @@ static inline uint64_t FLAG(node_t* ptr) {
 }
 
 static inline uint64_t TAG(node_t* ptr) {
-    return (((uint64_t)ptr)) | 2;
+    return (((uint64_t)ptr)) | 4;
 }
 
 static inline uint64_t UNTAG(node_t* ptr) {
-    return (((uint64_t)ptr) & 0xfffffffffffffffd);
+    return (((uint64_t)ptr) & 0xfffffffffffffffb);
 }
 
 static inline uint64_t UNFLAG(node_t* ptr) {
@@ -125,7 +125,7 @@ static inline uint64_t UNFLAG(node_t* ptr) {
 }
 
 static inline node_t* ADDRESS(volatile node_t* ptr) {
-    return (node_t*) (((uint64_t)ptr) & 0xfffffffffffffffc);
+    return (node_t*) (((uint64_t)ptr) & 0xfffffffffffffff8);
 }
 
 #endif
