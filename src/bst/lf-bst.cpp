@@ -131,15 +131,21 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
     node_t* new_node = NULL;
     uint created = 0;
     while (1) {
-      UPDATE_TRY();
+        UPDATE_TRY();
 
         bst_seek(key, node_r, epoch, buffer);
         if (seek_record->leaf->key == key) {
-#if GC == 1
-            if (created) {
-                ssmem_free(alloc, new_internal);
-                ssmem_free(alloc, new_node);
-            }
+// #if GC == 1
+//             if (created) {
+//                 ssmem_free(alloc, new_internal);
+//                 ssmem_free(alloc, new_node);
+//             }
+// #endif
+#ifdef BUFFERING_ON
+            cache_scan(buffer, key);
+#else
+            flush_and_try_unflag((PVOID*)&(seek_record->parent->left)); 
+            flush_and_try_unflag((PVOID*)&(seek_record->parent->right));
 #endif
             return FALSE;
         }
@@ -155,7 +161,7 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
         if (likely(created==0)) {
             new_internal=create_node(max(key,leaf->key),0,0,epoch);
             new_node = create_node(key,val,0,epoch);
-            write_data_wait((void*) new_node, CACHE_LINES_PER_NV_NODE);
+            write_data_nowait((void*) new_node, CACHE_LINES_PER_NV_NODE);
             created=1;
         } else {
             new_internal->key=max(key,leaf->key);
@@ -163,11 +169,11 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
         if ( key < leaf->key) {
             new_internal->left = new_node;
             new_internal->right = leaf;
-            write_data_nowait((void*) new_node, CACHE_LINES_PER_NV_NODE);
+            write_data_wait((void*) new_node, CACHE_LINES_PER_NV_NODE);
         } else {
             new_internal->right = new_node;
             new_internal->left = leaf;
-            write_data_nowait((void*) new_node, CACHE_LINES_PER_NV_NODE);
+            write_data_wait((void*) new_node, CACHE_LINES_PER_NV_NODE);
         }
  #ifdef __tile__
     MEM_BARRIER;
@@ -204,6 +210,12 @@ svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
         if (injecting == TRUE) {
             leaf = seek_record->leaf;
             if (leaf->key != key) {
+#ifdef BUFFERING_ON
+                cache_scan(buffer, key);
+#else
+                flush_and_try_unflag((PVOID*)&(seek_record->parent->left)); 
+                flush_and_try_unflag((PVOID*)&(seek_record->parent->right));
+#endif
                 return 0;
             }
             node_t* lf = ADDRESS(leaf);
@@ -278,10 +290,10 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 
     node_t* sibl = *sibling_addr;
     if ( CAS_PTR(succ_addr, ADDRESS(successor), UNTAG(sibl)) == ADDRESS(successor)) {
-#if GC == 1
-    ssmem_free(alloc, ADDRESS(chld));
-    ssmem_free(alloc, ADDRESS(successor));
-#endif
+// #if GC == 1
+//     ssmem_free(alloc, ADDRESS(chld));
+//     ssmem_free(alloc, ADDRESS(successor));
+// #endif
         return TRUE;
     }
     return FALSE;
