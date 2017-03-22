@@ -148,23 +148,26 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
 
         node_t** child_addr;
         if (key < parent->key) {
-      child_addr= (node_t**) &(parent->left); 
+            child_addr= (node_t**) &(parent->left); 
         } else {
             child_addr= (node_t**) &(parent->right);
         }
         if (likely(created==0)) {
             new_internal=create_node(max(key,leaf->key),0,0,epoch);
             new_node = create_node(key,val,0,epoch);
+            write_data_wait((void*) new_node, CACHE_LINES_PER_NV_NODE);
             created=1;
         } else {
             new_internal->key=max(key,leaf->key);
         }
         if ( key < leaf->key) {
             new_internal->left = new_node;
-            new_internal->right = leaf; 
+            new_internal->right = leaf;
+            write_data_nowait((void*) new_node, CACHE_LINES_PER_NV_NODE);
         } else {
             new_internal->right = new_node;
             new_internal->left = leaf;
+            write_data_nowait((void*) new_node, CACHE_LINES_PER_NV_NODE);
         }
  #ifdef __tile__
     MEM_BARRIER;

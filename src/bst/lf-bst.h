@@ -33,6 +33,7 @@
 #include "random.h"
 #include "lf-common.h"
 
+#define CACHE_LINES_PER_NV_NODE 1
 
 #define max(a,b) \
    ({ __typeof__ (a) _a = (a); \
