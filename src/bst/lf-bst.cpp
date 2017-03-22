@@ -109,8 +109,18 @@ seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcach
 svalue_t bst_search(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer) {
    bst_seek(key, node_r, epoch, buffer);
    if (seek_record->leaf->key == key) {
+#ifdef BUFFERING_ON
+        cache_scan(buffer, key);
+#else
+        flush_and_try_unflag((PVOID*)&(seek_record->parent->next));
+#endif
         return seek_record->leaf->value;
    } else {
+#ifdef BUFFERING_ON
+        cache_scan(buffer, key);
+#else
+        flush_and_try_unflag((PVOID*)&(seek_record->parent->next));
+#endif
         return 0;
    }
 }
@@ -275,12 +285,17 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 }
 
 uint32_t bst_size(volatile node_t* node) {
-    if (node == NULL) return 0; 
+    if (node == NULL) return 0;
+
     if ((node->left == NULL) && (node->right == NULL)) {
        if (node->key < INF0 ) return 1;
     }
     uint32_t l = 0;
     uint32_t r = 0;
+
+    flush_and_try_unflag((PVOID*)&(node->left));
+    flush_and_try_unflag((PVOID*)&(node->right));
+
     if ( !GETFLAG(node->left) && !GETTAG(node->left)) {
         l = bst_size(node->left);
     }
