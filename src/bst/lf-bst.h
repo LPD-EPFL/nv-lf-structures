@@ -129,4 +129,8 @@ static inline node_t* ADDRESS(volatile node_t* ptr) {
     return (node_t*) (((uint64_t)ptr) & 0xfffffffffffffff8);
 }
 
+static inline node_t* ADDRESS_W_CACHE_MARK_BIT(volatile node_t* ptr) {
+    return (node_t*) (((uint64_t)ptr) & 0xfffffffffffffffa);
+}
+
 #endif

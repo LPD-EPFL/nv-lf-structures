@@ -178,10 +178,16 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
  #ifdef __tile__
     MEM_BARRIER;
 #endif
-        node_t* result = CAS_PTR(child_addr, ADDRESS(leaf), ADDRESS(new_internal));
-        if (result == ADDRESS(leaf)) {
+        // node_t* result = CAS_PTR(child_addr, ADDRESS(leaf), ADDRESS(new_internal));
+        // if (result == ADDRESS(leaf)) {
+        //     return TRUE;
+        // }
+
+        if (cache_try_link_and_add(buffer, key, (volatile void **) child_addr, ADDRESS(leaf), ADDRESS(new_internal))) {
+
             return TRUE;
         }
+
         node_t* chld = *child_addr; 
         if ( (ADDRESS(chld)==leaf) && (GETFLAG(chld) || GETTAG(chld)) ) {
             bst_cleanup(key, epoch, buffer); 
@@ -277,7 +283,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
     }
 //#if defined(__tile__) || defined(__sparc__)
     while (1) {
-        node_t* untagged = *sibling_addr;
+        node_t* untagged = (node_t*) unmark_ptr_cache((UINT_PTR)*sibling_addr);
         node_t* tagged = (node_t*)TAG(untagged);
         node_t* res = CAS_PTR(sibling_addr,untagged, tagged);
         if (res == untagged) {
