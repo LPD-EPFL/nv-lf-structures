@@ -76,11 +76,11 @@ seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcach
     seek_record_l.ancestor = node_r;
     seek_record_l.successor = node_s; 
     seek_record_l.parent = node_s;
-    seek_record_l.leaf = ADDRESS(node_s->left);
+    seek_record_l.leaf = ADDRESS_W_CACHE_MARK_BIT(node_s->left);
 
-    node_t* parent_field = (node_t*) seek_record_l.parent->left;
-    node_t* current_field = (node_t*) seek_record_l.leaf->left;
-    node_t* current = ADDRESS(current_field);
+    node_t* parent_field = (node_t*) ADDRESS(seek_record_l.parent)->left;
+    node_t* current_field = (node_t*) ADDRESS(seek_record_l.leaf)->left;
+    node_t* current = ADDRESS_W_CACHE_MARK_BIT(current_field);
 
 
     while (current != NULL) {
@@ -92,12 +92,13 @@ seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcach
         seek_record_l.leaf = current;
 
         parent_field = current_field;
+        current = ADDRESS(current);
         if (key < current->key) {
             current_field= (node_t*) current->left;
         } else {
             current_field= (node_t*) current->right;
         }
-        current=ADDRESS(current_field);
+        current=ADDRESS_W_CACHE_MARK_BIT(current_field);
     }
     seek_record->ancestor=seek_record_l.ancestor;
     seek_record->successor=seek_record_l.successor;
@@ -108,13 +109,13 @@ seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcach
 
 svalue_t bst_search(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer) {
    bst_seek(key, node_r, epoch, buffer);
-   if (seek_record->leaf->key == key) {
+   if (ADDRESS(seek_record->leaf)->key == key) {
 #ifdef BUFFERING_ON
         cache_scan(buffer, key);
 #else
         flush_and_try_unflag((PVOID*)&(seek_record->parent->next));
 #endif
-        return seek_record->leaf->value;
+        return ADDRESS(seek_record->leaf)->value;
    } else {
 #ifdef BUFFERING_ON
         cache_scan(buffer, key);
@@ -134,7 +135,7 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
         UPDATE_TRY();
 
         bst_seek(key, node_r, epoch, buffer);
-        if (seek_record->leaf->key == key) {
+        if (ADDRESS(seek_record->leaf)->key == key) {
 // #if GC == 1
 //             if (created) {
 //                 ssmem_free(alloc, new_internal);
@@ -153,20 +154,21 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
         node_t* leaf = seek_record->leaf;
 
         node_t** child_addr;
+        parent = ADDRESS(parent);
         if (key < parent->key) {
             child_addr= (node_t**) &(parent->left); 
         } else {
             child_addr= (node_t**) &(parent->right);
         }
         if (likely(created==0)) {
-            new_internal=create_node(max(key,leaf->key),0,0,epoch);
+            new_internal=create_node(max(key,ADDRESS(leaf)->key),0,0,epoch);
             new_node = create_node(key,val,0,epoch);
             write_data_nowait((void*) new_node, CACHE_LINES_PER_NV_NODE);
             created=1;
         } else {
-            new_internal->key=max(key,leaf->key);
+            new_internal->key=max(key,ADDRESS(leaf)->key);
         }
-        if ( key < leaf->key) {
+        if ( key < ADDRESS(leaf)->key) {
             new_internal->left = new_node;
             new_internal->right = leaf;
             write_data_wait((void*) new_node, CACHE_LINES_PER_NV_NODE);
@@ -207,6 +209,9 @@ svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
         node_t* parent = seek_record->parent;
 
         node_t** child_addr;
+
+        parent = ADDRESS(parent);
+
         if (key < parent->key) {
             child_addr = (node_t**) &(parent->left);
         } else {
@@ -215,7 +220,7 @@ svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
 
         if (injecting == TRUE) {
             leaf = seek_record->leaf;
-            if (leaf->key != key) {
+            if (ADDRESS(leaf)->key != key) {
 #ifdef BUFFERING_ON
                 cache_scan(buffer, key);
 #else
@@ -259,6 +264,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
     //node_t* leaf = seek_record->leaf;
 
     node_t** succ_addr;
+    ancestor = ADDRESS(ancestor);
     if (key < ancestor->key) {
         succ_addr = (node_t**) &(ancestor->left);
     } else {
@@ -267,6 +273,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 
     node_t** child_addr;
     node_t** sibling_addr;
+    parent = ADDRESS(parent);
     if (key < parent->key) {
        child_addr = (node_t**) &(parent->left);
        sibling_addr = (node_t**) &(parent->right);
@@ -283,7 +290,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
     }
 //#if defined(__tile__) || defined(__sparc__)
     while (1) {
-        node_t* untagged = (node_t*) unmark_ptr_cache((UINT_PTR)*sibling_addr);
+        node_t* untagged = *sibling_addr;
         node_t* tagged = (node_t*)TAG(untagged);
         node_t* res = CAS_PTR(sibling_addr,untagged, tagged);
         if (res == untagged) {
@@ -295,7 +302,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 //#endif
 
     node_t* sibl = *sibling_addr;
-    if ( CAS_PTR(succ_addr, ADDRESS(successor), UNTAG(sibl)) == ADDRESS(successor)) {
+    if ( CAS_PTR(succ_addr, ADDRESS_W_CACHE_MARK_BIT(successor), UNTAG(sibl)) == ADDRESS_W_CACHE_MARK_BIT(successor)) {
 // #if GC == 1
 //     ssmem_free(alloc, ADDRESS(chld));
 //     ssmem_free(alloc, ADDRESS(successor));
