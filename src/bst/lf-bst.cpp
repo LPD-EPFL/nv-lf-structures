@@ -27,12 +27,12 @@ RETRY_STATS_VARS;
 
 __thread seek_record_t* seek_record;
 
-node_t* initialize_tree(EpochThread epoch){
-    node_t* r;
-    node_t* s;
-    node_t* inf0;
-    node_t* inf1;
-    node_t* inf2;
+NODE_PTR initialize_tree(EpochThread epoch){
+    NODE_PTR r;
+    NODE_PTR s;
+    NODE_PTR inf0;
+    NODE_PTR inf1;
+    NODE_PTR inf2;
     r = create_node(INF2,0,1,epoch);
     s = create_node(INF1,0,1,epoch);
     inf0 = create_node(INF0,0,1,epoch);
@@ -54,10 +54,10 @@ void bst_init_local() {
   assert(seek_record != NULL);
 }
 
-node_t* create_node(skey_t k, svalue_t value, int initializing, EpochThread epoch) {
-    volatile node_t* new_node;
+NODE_PTR create_node(skey_t k, svalue_t value, int initializing, EpochThread epoch) {
+    NODE_PTR new_node;
 
-    new_node = (node_t*) EpochAllocNode(epoch, sizeof(node_t));
+    new_node = (NODE_PTR) EpochAllocNode(epoch, sizeof(node_t));
 
     new_node->left = NULL;
     new_node->right = NULL;
@@ -66,21 +66,21 @@ node_t* create_node(skey_t k, svalue_t value, int initializing, EpochThread epoc
     // asm volatile("" ::: "memory");
     _mm_sfence();
 
-    return (node_t*) new_node;
+    return (NODE_PTR) new_node;
 }
 
-seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer) { 
+seek_record_t * bst_seek(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer) { 
     PARSE_TRY();
     volatile seek_record_t seek_record_l;
-    node_t* node_s = ADDRESS(node_r->left);
+    NODE_PTR node_s = ADDRESS(node_r->left);
     seek_record_l.ancestor = node_r;
     seek_record_l.successor = node_s; 
     seek_record_l.parent = node_s;
     seek_record_l.leaf = ADDRESS_W_CACHE_MARK_BIT(node_s->left);
 
-    node_t* parent_field = (node_t*) ADDRESS(seek_record_l.parent)->left;
-    node_t* current_field = (node_t*) ADDRESS(seek_record_l.leaf)->left;
-    node_t* current = ADDRESS_W_CACHE_MARK_BIT(current_field);
+    NODE_PTR parent_field = (NODE_PTR) ADDRESS(seek_record_l.parent)->left;
+    NODE_PTR current_field = (NODE_PTR) ADDRESS(seek_record_l.leaf)->left;
+    NODE_PTR current = ADDRESS_W_CACHE_MARK_BIT(current_field);
 
 
     while (current != NULL) {
@@ -94,9 +94,9 @@ seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcach
         parent_field = current_field;
         current = ADDRESS(current);
         if (key < current->key) {
-            current_field= (node_t*) current->left;
+            current_field= (NODE_PTR) current->left;
         } else {
-            current_field= (node_t*) current->right;
+            current_field= (NODE_PTR) current->right;
         }
         current=ADDRESS_W_CACHE_MARK_BIT(current_field);
     }
@@ -107,7 +107,7 @@ seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcach
     return seek_record;
 }
 
-svalue_t bst_search(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer) {
+svalue_t bst_search(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer) {
    bst_seek(key, node_r, epoch, buffer);
    if (ADDRESS(seek_record->leaf)->key == key) {
 #ifdef BUFFERING_ON
@@ -127,9 +127,9 @@ svalue_t bst_search(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
 }
 
 
-bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, linkcache_t* buffer) {
-    node_t* new_internal = NULL;
-    node_t* new_node = NULL;
+bool_t bst_insert(skey_t key, svalue_t val, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer) {
+    NODE_PTR new_internal = NULL;
+    NODE_PTR new_node = NULL;
     uint created = 0;
     while (1) {
         UPDATE_TRY();
@@ -150,15 +150,15 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
 #endif
             return FALSE;
         }
-        node_t* parent = seek_record->parent;
-        node_t* leaf = seek_record->leaf;
+        NODE_PTR parent = seek_record->parent;
+        NODE_PTR leaf = seek_record->leaf;
 
-        node_t** child_addr;
+        NODE_PTR* child_addr;
         parent = ADDRESS(parent);
         if (key < parent->key) {
-            child_addr= (node_t**) &(parent->left); 
+            child_addr= (NODE_PTR*) &(parent->left); 
         } else {
-            child_addr= (node_t**) &(parent->right);
+            child_addr= (NODE_PTR*) &(parent->right);
         }
         if (likely(created==0)) {
             new_internal=create_node(max(key,ADDRESS(leaf)->key),0,0,epoch);
@@ -190,32 +190,32 @@ bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, l
             return TRUE;
         }
 
-        node_t* chld = *child_addr; 
+        NODE_PTR chld = *child_addr; 
         if ( (ADDRESS(chld)==leaf) && (GETFLAG(chld) || GETTAG(chld)) ) {
             bst_cleanup(key, epoch, buffer); 
         }
     }
 }
 
-svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer) {
+svalue_t bst_remove(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer) {
     bool_t injecting = TRUE; 
-    node_t* leaf;
+    NODE_PTR leaf;
     svalue_t val = 0;
     while (1) {
       UPDATE_TRY();
 
         bst_seek(key, node_r, epoch, buffer);
         val = seek_record->leaf->value;
-        node_t* parent = seek_record->parent;
+        NODE_PTR parent = seek_record->parent;
 
-        node_t** child_addr;
+        NODE_PTR* child_addr;
 
         parent = ADDRESS(parent);
 
         if (key < parent->key) {
-            child_addr = (node_t**) &(parent->left);
+            child_addr = (NODE_PTR*) &(parent->left);
         } else {
-            child_addr = (node_t**) &(parent->right);
+            child_addr = (NODE_PTR*) &(parent->right);
         }
 
         if (injecting == TRUE) {
@@ -229,8 +229,8 @@ svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
 #endif
                 return 0;
             }
-            node_t* lf = ADDRESS(leaf);
-            node_t* result = CAS_PTR(child_addr, lf, FLAG(lf));
+            NODE_PTR lf = ADDRESS(leaf);
+            NODE_PTR result = CAS_PTR(child_addr, lf, FLAG(lf));
             if (result == ADDRESS(leaf)) {
                 injecting = FALSE;
                 bool_t done = bst_cleanup(key, epoch, buffer);
@@ -238,7 +238,7 @@ svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
                     return val;
                 }
             } else {
-                node_t* chld = *child_addr;
+                NODE_PTR chld = *child_addr;
                 if ( (ADDRESS(chld) == leaf) && (GETFLAG(chld) || GETTAG(chld)) ) {
                     bst_cleanup(key, epoch, buffer);
                 }
@@ -258,31 +258,31 @@ svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* 
 
 
 bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
-    node_t* ancestor = seek_record->ancestor;
-    node_t* successor = seek_record->successor;
-    node_t* parent = seek_record->parent;
+    NODE_PTR ancestor = seek_record->ancestor;
+    NODE_PTR successor = seek_record->successor;
+    NODE_PTR parent = seek_record->parent;
     //node_t* leaf = seek_record->leaf;
 
-    node_t** succ_addr;
+    NODE_PTR* succ_addr;
     ancestor = ADDRESS(ancestor);
     if (key < ancestor->key) {
-        succ_addr = (node_t**) &(ancestor->left);
+        succ_addr = (NODE_PTR*) &(ancestor->left);
     } else {
-        succ_addr = (node_t**) &(ancestor->right);
+        succ_addr = (NODE_PTR*) &(ancestor->right);
     }
 
-    node_t** child_addr;
-    node_t** sibling_addr;
+    NODE_PTR* child_addr;
+    NODE_PTR* sibling_addr;
     parent = ADDRESS(parent);
     if (key < parent->key) {
-       child_addr = (node_t**) &(parent->left);
-       sibling_addr = (node_t**) &(parent->right);
+       child_addr = (NODE_PTR*) &(parent->left);
+       sibling_addr = (NODE_PTR*) &(parent->right);
     } else {
-       child_addr = (node_t**) &(parent->right);
-       sibling_addr = (node_t**) &(parent->left);
+       child_addr = (NODE_PTR*) &(parent->right);
+       sibling_addr = (NODE_PTR*) &(parent->left);
     }
 
-    node_t* chld = *(child_addr);
+    NODE_PTR chld = *(child_addr);
     if (!GETFLAG(chld)) {
         chld = *(sibling_addr);
         asm volatile("");
@@ -290,9 +290,9 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
     }
 //#if defined(__tile__) || defined(__sparc__)
     while (1) {
-        node_t* untagged = *sibling_addr;
-        node_t* tagged = (node_t*)TAG(untagged);
-        node_t* res = CAS_PTR(sibling_addr,untagged, tagged);
+        NODE_PTR untagged = *sibling_addr;
+        NODE_PTR tagged = (NODE_PTR)TAG(untagged);
+        NODE_PTR res = CAS_PTR(sibling_addr,untagged, tagged);
         if (res == untagged) {
             break;
          }
@@ -301,7 +301,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 //    set_bit(sibling_addr,1);
 //#endif
 
-    node_t* sibl = *sibling_addr;
+    NODE_PTR sibl = *sibling_addr;
     if ( CAS_PTR(succ_addr, ADDRESS_W_CACHE_MARK_BIT(successor), UNTAG(sibl)) == ADDRESS_W_CACHE_MARK_BIT(successor)) {
 // #if GC == 1
 //     ssmem_free(alloc, ADDRESS(chld));
@@ -312,7 +312,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
     return FALSE;
 }
 
-uint32_t bst_size(volatile node_t* node) {
+uint32_t bst_size(NODE_PTR node) {
     if (node == NULL) return 0;
 
     if ((node->left == NULL) && (node->right == NULL)) {

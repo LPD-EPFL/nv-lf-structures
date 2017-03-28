@@ -56,11 +56,13 @@ typedef uint8_t bool_t;
 
 typedef ALIGNED(64) struct node_t node_t;
 
+typedef volatile node_t* NODE_PTR;
+
 struct node_t{
     skey_t key;
     svalue_t value;
-    volatile node_t* right;
-    volatile node_t* left;
+    NODE_PTR right;
+    NODE_PTR left;
   uint8_t padding[32];
 };
 
@@ -82,55 +84,55 @@ static inline bool_t set_bit2(volatile uintptr_t *array, int bit) {
 
 
 typedef ALIGNED(CACHE_LINE_SIZE) struct seek_record_t{
-    node_t* ancestor;
-    node_t* successor;
-    node_t* parent;
-    node_t* leaf;
+    NODE_PTR ancestor;
+    NODE_PTR successor;
+    NODE_PTR parent;
+    NODE_PTR leaf;
   uint8_t padding[32];
 } seek_record_t;
 
 //extern __thread seek_record_t* seek_record;
 
-node_t* initialize_tree(EpochThread epoch);
+NODE_PTR initialize_tree(EpochThread epoch);
 void bst_init_local();
-node_t* create_node(skey_t k, svalue_t value, int initializing, EpochThread epoch);
-seek_record_t * bst_seek(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
-svalue_t bst_search(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
-bool_t bst_insert(skey_t key, svalue_t val, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
-svalue_t bst_remove(skey_t key, node_t* node_r, EpochThread epoch, linkcache_t* buffer);
+NODE_PTR create_node(skey_t k, svalue_t value, int initializing, EpochThread epoch);
+seek_record_t * bst_seek(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer);
+svalue_t bst_search(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer);
+bool_t bst_insert(skey_t key, svalue_t val, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer);
+svalue_t bst_remove(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t* buffer);
 bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer);
-uint32_t bst_size(volatile node_t* r);
+uint32_t bst_size(volatile NODE_PTR r);
 
-static inline uint64_t GETFLAG(volatile node_t* ptr) {
+static inline uint64_t GETFLAG(volatile NODE_PTR ptr) {
     return ((uint64_t)ptr) & 1;
 }
 
-static inline uint64_t GETTAG(volatile node_t* ptr) {
+static inline uint64_t GETTAG(volatile NODE_PTR ptr) {
     return ((uint64_t)ptr) & 4;
 }
 
-static inline uint64_t FLAG(node_t* ptr) {
+static inline uint64_t FLAG(NODE_PTR ptr) {
     return (((uint64_t)ptr)) | 1;
 }
 
-static inline uint64_t TAG(node_t* ptr) {
+static inline uint64_t TAG(NODE_PTR ptr) {
     return (((uint64_t)ptr)) | 4;
 }
 
-static inline uint64_t UNTAG(node_t* ptr) {
+static inline uint64_t UNTAG(NODE_PTR ptr) {
     return (((uint64_t)ptr) & 0xfffffffffffffffb);
 }
 
-static inline uint64_t UNFLAG(node_t* ptr) {
+static inline uint64_t UNFLAG(NODE_PTR ptr) {
     return (((uint64_t)ptr) & 0xfffffffffffffffe);
 }
 
-static inline node_t* ADDRESS(volatile node_t* ptr) {
-    return (node_t*) (((uint64_t)ptr) & 0xfffffffffffffff8);
+static inline NODE_PTR ADDRESS(volatile NODE_PTR ptr) {
+    return (NODE_PTR) (((uint64_t)ptr) & 0xfffffffffffffff8);
 }
 
-static inline node_t* ADDRESS_W_CACHE_MARK_BIT(volatile node_t* ptr) {
-    return (node_t*) (((uint64_t)ptr) & 0xfffffffffffffffa);
+static inline NODE_PTR ADDRESS_W_CACHE_MARK_BIT(volatile NODE_PTR ptr) {
+    return (NODE_PTR) (((uint64_t)ptr) & 0xfffffffffffffffa);
 }
 
 #endif

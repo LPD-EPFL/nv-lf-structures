@@ -38,7 +38,7 @@
 #define DS_IS_REACHABLE(s,a) is_reachable(s,a)
 #define DS_RECOVER(s,p,n) recover(s,p,n)
 
-#define DS_TYPE             node_t
+#define DS_TYPE             NODE_PTR
 #define DS_NODE             node_t
 #define DS_KEY              skey_t
 
@@ -93,7 +93,7 @@ barrier_t barrier, barrier_global;
 typedef struct thread_data
 {
   uint32_t id;
-  DS_TYPE* set;
+  DS_TYPE set;
   active_page_table_t* page_table;
   linkcache_t* lc;
 } thread_data_t;
@@ -107,7 +107,7 @@ test(void* thread)
   set_cpu(ID);
   DS_LOCAL();
 
-  DS_TYPE* set = td->set;
+  DS_TYPE set = td->set;
 
   THREAD_INIT(ID);
   PF_INIT(3, SSPFD_NUM_ENTRIES, ID);
@@ -393,7 +393,7 @@ main(int argc, char **argv)
     EpochGlobalInit(lc);
 
     EpochThread epoch = EpochThreadInit(num_threads);
-  DS_TYPE* set = DS_NEW(epoch);
+  DS_TYPE set = DS_NEW(epoch);
   assert(set != NULL);
 
   /* Initializes the local data */
