@@ -164,6 +164,7 @@ CFLAGS += -I$(ROOT)/external/include
 CFLAGS += -I$(NVRAM_PATH)/include/libnvram
 CFLAGS += -I$(NVML_PATH)/include
 CFLAGS += -I$(JEMALLOC_PATH)/include
+CFLAGS += -I$(ATOMIC_OPS_PATH)/include -I$(ATOMIC_OPS_PATH)/include/atomic_ops -I$(ATOMIC_OPS_PATH)/include/atomic_ops/sysdeps
 
 LDFLAGS += -L${JEMALLOC_PATH}/lib -Wl,-rpath,${JEMALLOC_PATH}/lib -ljemalloc
 LDFLAGS += -L${NVRAM_PATH}/lib -lnvram

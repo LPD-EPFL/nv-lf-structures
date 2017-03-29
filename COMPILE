@@ -2,5 +2,6 @@ The following environment variables need to be set:
 * NVML_PATH - the installation path of NVML
 * JEMALLOC_PATH - the installation path of nv-jemalloc
 * NVRAM_PATH - the installation path of libnvram
+* ATOMIC_OPS_PATH - the installation path of libatomic_ops
 * PMEM_IS_PMEM_FORCE=1
 
