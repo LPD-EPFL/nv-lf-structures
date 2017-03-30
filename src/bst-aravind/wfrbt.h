@@ -69,6 +69,7 @@ typedef struct thread_data {
   std::vector<node_t *> recycledNodes;
   seekRecord_t * sr; // seek record
   seekRecord_t * ssr; // secondary seek record
+  linkcache_t* buffer;
 
 #ifdef DETAILED_STATS	
   double tot_read_time; 
@@ -115,11 +116,12 @@ bool mark_Node(volatile AO_t * word){
 
 
 //-------------------------------------------------------------
-#define create_child_word(addr, mark, flag) (((uintptr_t) addr << 2) + (mark << 1) + (flag))
+#define create_child_word(addr, mark, flag) (((uintptr_t) addr & ~(uintptr_t)0x03) + (mark << 1) + (flag))
 #define is_marked(x) ( ((x >> 1) & 1)  == 1 ? true:false)
 #define is_flagged(x) ( (x & 1 )  == 1 ? true:false)
 
-#define get_addr(x) (x >> 2)
+#define get_addr_for_reading(x) ((uintptr_t)x & ~(uintptr_t)0x07)
+#define get_addr_for_comparing(x) ((uintptr_t)x & ~(uintptr_t)0x03)
 #define add_mark_bit(x) (x + 4UL)
 #define is_free(x) (((x) & 3) == 0? true:false)
 

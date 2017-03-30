@@ -104,6 +104,11 @@ seek_record_t * bst_seek(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcac
     seek_record->successor=seek_record_l.successor;
     seek_record->parent=seek_record_l.parent;
     seek_record->leaf=seek_record_l.leaf;
+
+    if ((key > ADDRESS(seek_record_l.parent)->key && ADDRESS(seek_record_l.leaf)->key < ADDRESS(seek_record_l.parent)->key) 
+            || (key < ADDRESS(seek_record_l.parent)->key && ADDRESS(seek_record_l.leaf)->key > ADDRESS(seek_record_l.parent)->key)) {
+        printf("WEIRD STUFF!\n");
+    }
     return seek_record;
 }
 
@@ -185,7 +190,7 @@ bool_t bst_insert(skey_t key, svalue_t val, NODE_PTR node_r, EpochThread epoch, 
         //     return TRUE;
         // }
 
-        if (cache_try_link_and_add(buffer, key, (volatile void **) child_addr, ADDRESS(leaf), ADDRESS(new_internal))) {
+        if (cache_try_link_and_add(buffer, key, (volatile void **) child_addr, ADDRESS_W_CACHE_MARK_BIT(leaf), ADDRESS_W_CACHE_MARK_BIT(new_internal))) {
 
             return TRUE;
         }
@@ -229,9 +234,9 @@ svalue_t bst_remove(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t*
 #endif
                 return 0;
             }
-            NODE_PTR lf = ADDRESS(leaf);
+            NODE_PTR lf = ADDRESS_W_CACHE_MARK_BIT(leaf);
             NODE_PTR result = CAS_PTR(child_addr, lf, FLAG(lf));
-            if (result == ADDRESS(leaf)) {
+            if (result == ADDRESS_W_CACHE_MARK_BIT(leaf)) {
                 injecting = FALSE;
                 bool_t done = bst_cleanup(key, epoch, buffer);
                 if (done == TRUE) {
@@ -239,7 +244,7 @@ svalue_t bst_remove(skey_t key, NODE_PTR node_r, EpochThread epoch, linkcache_t*
                 }
             } else {
                 NODE_PTR chld = *child_addr;
-                if ( (ADDRESS(chld) == leaf) && (GETFLAG(chld) || GETTAG(chld)) ) {
+                if ( (ADDRESS_W_CACHE_MARK_BIT(chld) == leaf) && (GETFLAG(chld) || GETTAG(chld)) ) {
                     bst_cleanup(key, epoch, buffer);
                 }
             }
@@ -302,7 +307,9 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 //#endif
 
     NODE_PTR sibl = *sibling_addr;
-    if ( CAS_PTR(succ_addr, ADDRESS_W_CACHE_MARK_BIT(successor), UNTAG(sibl)) == ADDRESS_W_CACHE_MARK_BIT(successor)) {
+    if (cache_try_link_and_add(buffer, key, (volatile void **)succ_addr, ADDRESS_W_CACHE_MARK_BIT(successor), (void*)UNTAG(sibl))) {
+    // if ( CAS_PTR(succ_addr, ADDRESS_W_CACHE_MARK_BIT(successor), UNTAG(sibl)) == ADDRESS_W_CACHE_MARK_BIT(successor)) {
+
 // #if GC == 1
 //     ssmem_free(alloc, ADDRESS(chld));
 //     ssmem_free(alloc, ADDRESS(successor));
@@ -313,6 +320,7 @@ bool_t bst_cleanup(skey_t key, EpochThread epoch, linkcache_t* buffer) {
 }
 
 uint32_t bst_size(NODE_PTR node) {
+    node = ADDRESS(node);
     if (node == NULL) return 0;
 
     if ((node->left == NULL) && (node->right == NULL)) {

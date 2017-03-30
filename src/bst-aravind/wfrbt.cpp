@@ -31,7 +31,7 @@ Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees
 #include <signal.h>
 #include <sys/time.h>
 
-
+#include <link-cache.h>
 #include "wfrbt.h"
 #include "operations.h" 
 
@@ -85,13 +85,13 @@ long leafNodes = 0;
 long in_order_visit(node_t * rootNode){
 	long key = rootNode->key;
 	
-	if((node_t *)get_addr(rootNode->child.AO_val1) == NULL){
+	if((node_t *)get_addr_for_reading(rootNode->child.AO_val1) == NULL){
 		leafNodes++;
 		return (key);
 	}
 	
-	node_t * lChild = (node_t *)get_addr(rootNode->child.AO_val1);
-	node_t * rChild = (node_t *)get_addr(rootNode->child.AO_val2);
+	node_t * lChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val1);
+	node_t * rChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val2);
 	
 	if((lChild) != NULL){
 		long lKey = in_order_visit(lChild);
@@ -135,7 +135,7 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
   newLeaf->child.AO_val2 = 0;
   newLeaf->key = newKey;
 		
-  node_t * existLeaf = (node_t *)get_addr(R->pL);
+  node_t * existLeaf = (node_t *)get_addr_for_reading(R->pL);
   long existKey = R->leafKey;
 		
   if(newKey < existKey){
@@ -157,10 +157,12 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
   int result;
 		
   if(R->isLeftL){
-    result = atomic_cas_full(&R->parent->child.AO_val1, R->pL, newCasField);
+    // result = atomic_cas_full(&R->parent->child.AO_val1, R->pL, newCasField);
+    result = cache_try_link_and_add(data->buffer, newKey, (volatile void**)&R->parent->child.AO_val1, (volatile void*)R->pL, (volatile void*)newCasField);
   }
   else{
-    result = atomic_cas_full(&R->parent->child.AO_val2, R->pL, newCasField);
+    // result = atomic_cas_full(&R->parent->child.AO_val2, R->pL, newCasField);
+    result = cache_try_link_and_add(data->buffer, newKey, (volatile void**)&R->parent->child.AO_val2, (volatile void*)R->pL, (volatile void*)newCasField);
   }
 		
   if(result == 1){
@@ -196,19 +198,21 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
   AO_t newWord;
 		
   if(is_flagged(pS)){
-    newWord = create_child_word((node_t *)get_addr(pS), UNMARK, FLAG);	
+    newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, FLAG);	
   }
   else{
-    newWord = create_child_word((node_t *)get_addr(pS), UNMARK, UNFLAG);
+    newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, UNFLAG);
   }
 		
   int result;
 		
   if(R->isLeftUM){
-    result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+    // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+    result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val1, (volatile void*)R->lumC, (volatile void*)newWord);
   }
   else{
-    result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+    // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+    result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val2, (volatile void*)R->lumC, (volatile void*)newWord);
   }
 
   return result;	
@@ -504,7 +508,7 @@ int main(int argc, char **argv)
   
   
   data = new thread_data_t[nb_threads];
-
+  linkcache_t* lc = cache_create();
 
   if ((threads = (pthread_t *)malloc(nb_threads * sizeof(pthread_t))) == NULL) {
     perror("malloc");
@@ -549,6 +553,7 @@ node_t * newRT = new node_t;
   data[i1].ops = 0;
   data[i1].rootOfTree = newRT;
   data[i1].barrier = barrier;
+  data[i1].buffer = lc;
     
 #ifdef DETAILED_STATS
    data[i1].tot_reads = 0;
@@ -605,6 +610,7 @@ node_t * newRT = new node_t;
     data[i].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
     data[i].sr = new seekRecord_t;
     data[i].ssr = new seekRecord_t;
+    data[i].buffer = lc;
    
 #ifdef DETAILED_STATS	 
     data[i].tot_reads = 0;

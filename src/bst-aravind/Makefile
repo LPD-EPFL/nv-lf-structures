@@ -12,18 +12,18 @@ all: wfrbt.o wfrbt
 
 VERSION = TCMALLOC_NO_UPDATE
 
-CC = g++ -O3 -std=gnu++0x -g
+CC = g++ -std=gnu++0x
 
 ifeq "$(VERSION)" "MALLOC_UPDATE"
-CFLAGS = -lpthread -lrt -DUPDATEVAL
+CFLAGS += -lpthread -lrt -DUPDATEVAL
 else
 ifeq "$(VERSION)" "TCMALLOC_UPDATE"
-CFLAGS = -lpthread -lrt /usr/lib64/libtcmalloc.so.4 -DUPDATEVAL
+CFLAGS += -lpthread -lrt /usr/lib64/libtcmalloc.so.4 -DUPDATEVAL
 else
 ifeq "$(VERSION)" "JEMALLOC_NO_UPDATE"
-CFLAGS = -pthread -lrt /home/naravind/research/jemalloc-x64/lib/libjemalloc.so.1
+CFLAGS += -pthread -lrt /home/naravind/research/jemalloc-x64/lib/libjemalloc.so.1
 else
-CFLAGS = -pthread -lrt
+CFLAGS += -pthread -lrt
 endif
 endif
 endif

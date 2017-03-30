@@ -1,4 +1,4 @@
-
+typedef volatile void* VPVOID; 
 
 seekRecord_t * insseek(thread_data_t * data, long key, int op){
 	
@@ -17,7 +17,7 @@ seekRecord_t * insseek(thread_data_t * data, long key, int op){
 	bool isleafchildLC; // is leafchild the left child of leaf
 	
 	
-	leaf = (node_t *)get_addr(leafPointerWord);
+	leaf = (node_t *)get_addr_for_reading(leafPointerWord);
 		if(key < leaf->key){
 			leafchildPointerWord = leaf->child.AO_val1;
 			isleafchildLC = true;
@@ -28,7 +28,7 @@ seekRecord_t * insseek(thread_data_t * data, long key, int op){
 			isleafchildLC = false;
 		}
 	
-	leafchild = (node_t *)get_addr(leafchildPointerWord);
+	leafchild = (node_t *)get_addr_for_comparing(leafchildPointerWord);
 	
 	
 	
@@ -43,7 +43,7 @@ seekRecord_t * insseek(thread_data_t * data, long key, int op){
 		leafPointerWord = leafchildPointerWord;
 		isleafLC = isleafchildLC;
 		
-		leaf = leafchild;
+		leaf = (node_t *)get_addr_for_reading((AO_t)leafchild);
 		
 		
 		if(key < leaf->key){
@@ -54,8 +54,8 @@ seekRecord_t * insseek(thread_data_t * data, long key, int op){
 			leafchildPointerWord = leaf->child.AO_val2;
 			isleafchildLC = false;
 		}	
-		
-		leafchild = (node_t *)get_addr(leafchildPointerWord);
+				
+		leafchild = (node_t *)get_addr_for_comparing(leafchildPointerWord);
 		
 	}
 	
@@ -98,7 +98,7 @@ seekRecord_t * delseek(thread_data_t * data, long key, int op){
 	bool isleafchildLC; // is leafchild the left child of leaf
 	
 	
-	leaf = (node_t *)get_addr(leafPointerWord);
+	leaf = (node_t *)get_addr_for_reading(leafPointerWord);
 		if(key < leaf->key){
 			leafchildPointerWord = leaf->child.AO_val1;
 			isleafchildLC = true;
@@ -109,7 +109,7 @@ seekRecord_t * delseek(thread_data_t * data, long key, int op){
 			isleafchildLC = false;
 		}
 	
-	leafchild = (node_t *)get_addr(leafchildPointerWord);
+	leafchild = (node_t *)get_addr_for_comparing(leafchildPointerWord);
 	
 	
 	
@@ -124,7 +124,7 @@ seekRecord_t * delseek(thread_data_t * data, long key, int op){
 		leafPointerWord = leafchildPointerWord;
 		isleafLC = isleafchildLC;
 		
-		leaf = leafchild;
+		leaf = (node_t*)get_addr_for_reading((AO_t)leafchild);
 		
 		
 		if(key < leaf->key){
@@ -136,7 +136,7 @@ seekRecord_t * delseek(thread_data_t * data, long key, int op){
 			isleafchildLC = false;
 		}	
 		
-		leafchild = (node_t *)get_addr(leafchildPointerWord);
+		leafchild = (node_t *)get_addr_for_comparing(leafchildPointerWord);
 		
 	}
 		
@@ -167,7 +167,7 @@ seekRecord_t * delseek(thread_data_t * data, long key, int op){
 
 seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr){
 	
-	node_t * flaggedLeaf = (node_t *)get_addr(sr->pL);
+	node_t * flaggedLeaf = (node_t *)get_addr_for_reading(sr->pL);
 	node_t * gpar = NULL; // last node (ancestor of parent on access path) whose child pointer field is unmarked
 	node_t * par = data->rootOfTree;
 	node_t * leaf;
@@ -182,7 +182,7 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
 	bool isleafchildLC; // is leafchild the left child of leaf
 	
 	
-	leaf = (node_t *)get_addr(leafPointerWord);
+	leaf = (node_t *)get_addr_for_reading(leafPointerWord);
 	if(key < leaf->key){
 	  leafchildPointerWord = leaf->child.AO_val1;
 		isleafchildLC = true;
@@ -192,7 +192,7 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
 		isleafchildLC = false;
 	}
 	
-	leafchild = (node_t *)get_addr(leafchildPointerWord);
+	leafchild = (node_t *)get_addr_for_comparing(leafchildPointerWord);
 	
   while(leafchild != NULL){
 		if(!is_marked(leafPointerWord)){
@@ -205,7 +205,7 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
 		leafPointerWord = leafchildPointerWord;
 		isleafLC = isleafchildLC;
 		
-		leaf = leafchild;
+		leaf = (node_t*)get_addr_for_reading((AO_t)leafchild);
 		
 		if(key < leaf->key){
 			leafchildPointerWord = leaf->child.AO_val1;
@@ -216,7 +216,7 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
 			isleafchildLC = false;
 		}	
 		
-		leafchild = (node_t *)get_addr(leafchildPointerWord);
+		leafchild = (node_t *)get_addr_for_comparing(leafchildPointerWord);
 		
 	}
 			
@@ -245,11 +245,11 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
 
 bool search(thread_data_t * data, long key){
 	
-	node_t * cur = (node_t *)get_addr(data->rootOfTree->child.AO_val1);
+	node_t * cur = (node_t *)get_addr_for_reading(data->rootOfTree->child.AO_val1);
 	long lastKey;	
 	while(cur != NULL){
 	  lastKey = cur->key;
-		cur = (key < lastKey? (node_t *)get_addr(cur->child.AO_val1): (node_t *)get_addr(cur->child.AO_val2));
+		cur = (key < lastKey? (node_t *)get_addr_for_reading(cur->child.AO_val1): (node_t *)get_addr_for_reading(cur->child.AO_val2));
 	}
 	
   return (key == lastKey);
@@ -282,19 +282,21 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
 		AO_t newWord;
 		
 		if(is_flagged(pS)){
-			newWord = create_child_word((node_t *)get_addr(pS), UNMARK, FLAG);	
+			newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, FLAG);	
 		}
 		else{
-			newWord = create_child_word((node_t *)get_addr(pS), UNMARK, UNFLAG);
+			newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, UNFLAG);
 		}
 		
 		int result;
 		
 		if(R->isLeftUM){
-			 result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+			 // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+			 result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val1, (VPVOID)R->lumC, (VPVOID)newWord);
 		}
 		else{
-			 result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+			 // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+			 result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
 		}
 		
 		return result; 
@@ -307,19 +309,21 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
 		AO_t newWord;
 		
 		if(is_flagged(R->pL)){
-			newWord = create_child_word((node_t *)get_addr(R->pL), UNMARK, FLAG);
+			newWord = create_child_word((node_t *)get_addr_for_comparing(R->pL), UNMARK, FLAG);
 		}
 		else{
-			newWord = create_child_word((node_t *)get_addr(R->pL), UNMARK, UNFLAG);
+			newWord = create_child_word((node_t *)get_addr_for_comparing(R->pL), UNMARK, UNFLAG);
 		}
 		
 		int result;
 		
 		if(R->isLeftUM){
-			 result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+			 // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+			 result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val1, (VPVOID)R->lumC, (VPVOID)newWord);
 		}
 		else{
-			result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+			// result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+			result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
 		}
 		
     return result; 
@@ -337,16 +341,18 @@ int inject(thread_data_t * data, seekRecord_t * R, int op){
 		
 		//1. Flag L
 		
-		AO_t newWord = create_child_word((node_t *)get_addr(R->pL),UNMARK,FLAG);
+		AO_t newWord = create_child_word((node_t *)get_addr_for_comparing(R->pL),UNMARK,FLAG);
 		
 		int result; 
 		
 		if(R->isLeftL){
-			result = atomic_cas_full(&R->parent->child.AO_val1, R->pL, newWord);
+			// result = atomic_cas_full(&R->parent->child.AO_val1, R->pL, newWord);
+			result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->parent->child.AO_val1, (VPVOID)R->pL, (VPVOID)newWord);
 			
 		}
 		else{
-			result = atomic_cas_full(&R->parent->child.AO_val2, R->pL, newWord);
+			// result = atomic_cas_full(&R->parent->child.AO_val2, R->pL, newWord);
+			result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->parent->child.AO_val2, (VPVOID)R->pL, (VPVOID)newWord);
 		}
 		
 		return result;
