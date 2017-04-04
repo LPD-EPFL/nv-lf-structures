@@ -26,11 +26,11 @@ enum {UNFLAG,FLAG};
 typedef uintptr_t Word;
 
 typedef struct node{
-	int key;
-	AO_double_t volatile child;
-	#ifdef UPDATE_VAL
-		long value;
-	#endif
+    int key;
+    AO_double_t volatile child;
+    #ifdef UPDATE_VAL
+        long value;
+    #endif
 } node_t;
 
 typedef struct seekRecord{
@@ -71,7 +71,7 @@ typedef struct thread_data {
   seekRecord_t * ssr; // secondary seek record
   linkcache_t* buffer;
 
-#ifdef DETAILED_STATS	
+#ifdef DETAILED_STATS    
   double tot_read_time; 
   double tot_fastins_time;
   double tot_slowins_time;
@@ -109,7 +109,7 @@ inline bool SetBit(volatile unsigned long *array, int bit) {
 }
 
 bool mark_Node(volatile AO_t * word){
-	return (SetBit(word, MARK_BIT));
+    return (SetBit(word, MARK_BIT));
 }
 
 #define atomic_cas_full(addr, old_val, new_val) __sync_bool_compare_and_swap(addr, old_val, new_val);

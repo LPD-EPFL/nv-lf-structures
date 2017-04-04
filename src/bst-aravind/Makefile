@@ -5,7 +5,7 @@ include $(ROOT)/common/Makefile.common
 BINS = $(BINDIR)/wfrbt
 PROF = $(ROOT)/src
 
-.PHONY:	all clean
+.PHONY:    all clean
 
 all: wfrbt.o wfrbt
 

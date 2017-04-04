@@ -19,7 +19,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
 
-Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees by Aravind Natarajan and Neeraj Mittal if you use our code in your experiments	
+Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees by Aravind Natarajan and Neeraj Mittal if you use our code in your experiments    
 
  Features:
 1. Insert operations directly install their window without injecting the operation into the tree. They help any conflicting operation at the injection point, before executing their window txn.
@@ -58,10 +58,10 @@ Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees
 #define DEFAULT_SEARCH_FRAC             0.0
 #define DEFAULT_INSERT_FRAC             0.5
 #define DEFAULT_DELETE_FRAC             0.5
-#define DEFAULT_READER_THREADS         	0
+#define DEFAULT_READER_THREADS             0
 #define DEFAULT_KEYSPACE1_SIZE          100
 #define KEYSPACE1_PROB                  1.0
-#define LOWERHALF 		                  0.99
+#define LOWERHALF                           0.99
 
 #define XSTR(s)                         STR(s)
 #define STR(s)                          #s
@@ -83,32 +83,32 @@ long leafNodes = 0;
  * ################################################################### */
  
 long in_order_visit(node_t * rootNode){
-	long key = rootNode->key;
-	
-	if((node_t *)get_addr_for_reading(rootNode->child.AO_val1) == NULL){
-		leafNodes++;
-		return (key);
-	}
-	
-	node_t * lChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val1);
-	node_t * rChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val2);
-	
-	if((lChild) != NULL){
-		long lKey = in_order_visit(lChild);
-		if(lKey >= key){
-			std::cout << "Lkey is larger!!__" << lKey << "__ " << key << std::endl;
-			std::cout << "Sanity Check Failed!!" << std::endl;
-		}
-	}
-	
-	if((rChild) != NULL){
-		long rKey = in_order_visit(rChild);
-		if(rKey < key){
-			std::cout << "Rkey is smaller!!__" << rKey << "__ " << key <<  std::endl;
-			std::cout << "Sanity Check Failed!!" << std::endl;
-		}
-	}
-	return (key);
+    long key = rootNode->key;
+    
+    if((node_t *)get_addr_for_reading(rootNode->child.AO_val1) == NULL){
+        leafNodes++;
+        return (key);
+    }
+    
+    node_t * lChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val1);
+    node_t * rChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val2);
+    
+    if((lChild) != NULL){
+        long lKey = in_order_visit(lChild);
+        if(lKey >= key){
+            std::cout << "Lkey is larger!!__" << lKey << "__ " << key << std::endl;
+            std::cout << "Sanity Check Failed!!" << std::endl;
+        }
+    }
+    
+    if((rChild) != NULL){
+        long rKey = in_order_visit(rChild);
+        if(rKey < key){
+            std::cout << "Rkey is smaller!!__" << rKey << "__ " << key <<  std::endl;
+            std::cout << "Sanity Check Failed!!" << std::endl;
+        }
+    }
+    return (key);
 }
 
 
@@ -117,9 +117,9 @@ long in_order_visit(node_t * rootNode){
 /*************************************************************************************************/
 int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, long newKey){
   node_t *newInt ;
-	node_t *newLeaf;
+    node_t *newLeaf;
   if(data->recycledNodes.empty()){
-	  node_t * allocedNodeArr =(node_t *)malloc(2*sizeof(node_t));// new pointerNode_t[2];
+      node_t * allocedNodeArr =(node_t *)malloc(2*sizeof(node_t));// new pointerNode_t[2];
     newInt = &allocedNodeArr[0];
     newLeaf = &allocedNodeArr[1]; 
   }
@@ -130,32 +130,36 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
     newLeaf = data->recycledNodes.back();
     data->recycledNodes.pop_back();
   }
-		
+        
   newLeaf->child.AO_val1 = 0;
   newLeaf->child.AO_val2 = 0;
   newLeaf->key = newKey;
-		
+
+  write_data_wait((void*) newInt, CACHE_LINES_PER_NV_NODE);      
+  write_data_nowait((void*) newLeaf, CACHE_LINES_PER_NV_NODE);
+    
   node_t * existLeaf = (node_t *)get_addr_for_reading(R->pL);
   long existKey = R->leafKey;
-		
+
+        
   if(newKey < existKey){
     // key is to be inserted on lchild
     newInt->key = existKey;
-    newInt->child.AO_val1 = create_child_word(newLeaf,0,0);			
+    newInt->child.AO_val1 = create_child_word(newLeaf,0,0);            
     newInt->child.AO_val2 = create_child_word(existLeaf,0,0);
   }
   else{
     // key is to be inserted on rchild
     newInt->key = newKey;
-    newInt->child.AO_val2 = create_child_word(newLeaf,0,0);			
+    newInt->child.AO_val2 = create_child_word(newLeaf,0,0);            
     newInt->child.AO_val1 = create_child_word(existLeaf,0,0);
   }
-		
+        
   // cas to replace window
   AO_t newCasField;
   newCasField = create_child_word(newInt,UNMARK,UNFLAG);
   int result;
-		
+        
   if(R->isLeftL){
     // result = atomic_cas_full(&R->parent->child.AO_val1, R->pL, newCasField);
     result = cache_try_link_and_add(data->buffer, newKey, (volatile void**)&R->parent->child.AO_val1, (volatile void*)R->pL, (volatile void*)newCasField);
@@ -164,7 +168,7 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
     // result = atomic_cas_full(&R->parent->child.AO_val2, R->pL, newCasField);
     result = cache_try_link_and_add(data->buffer, newKey, (volatile void**)&R->parent->child.AO_val2, (volatile void*)R->pL, (volatile void*)newCasField);
   }
-		
+        
   if(result == 1){
     // successfully inserted.
     data->numInsert++;
@@ -183,7 +187,7 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
 int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, long key){
   
   AO_t pS;
-	
+    
   // mark sibling.
   if(R->isLeftL){
     // L is the left child of P
@@ -194,18 +198,18 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
     mark_Node(&R->parent->child.AO_val1);
     pS = R->parent->child.AO_val1;
   }
-	 	
+         
   AO_t newWord;
-		
+        
   if(is_flagged(pS)){
-    newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, FLAG);	
+    newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, FLAG);    
   }
   else{
     newWord = create_child_word((node_t *)get_addr_for_comparing(pS), UNMARK, UNFLAG);
   }
-		
+        
   int result;
-		
+        
   if(R->isLeftUM){
     // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
     result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val1, (volatile void*)R->lumC, (volatile void*)newWord);
@@ -215,7 +219,7 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
     result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val2, (volatile void*)R->lumC, (volatile void*)newWord);
   }
 
-  return result;	
+  return result;    
 }
 
 
@@ -284,49 +288,49 @@ restart:
   while (stop == 0) {
     // determine what we're going to do
     action = (double)rand_r(&d->seed) / (double) RAND_MAX;
-  	key = rand_r(&d->seed) % (d->keyspace1_size);
+      key = rand_r(&d->seed) % (d->keyspace1_size);
     while(key == 0){
-	    key = rand_r(&d->seed) % (d->keyspace1_size);
-	  }
+        key = rand_r(&d->seed) % (d->keyspace1_size);
+      }
  
     if (action <= d->search_frac){
       // Search Operation
 #ifdef DETAILED_STATS
       auto search_start = std::chrono::high_resolution_clock::now();
 #endif
-	    
+        
       search(d, key);
 
 #ifdef DETAILED_STATS
-	    auto search_end = std::chrono::high_resolution_clock::now();
+        auto search_end = std::chrono::high_resolution_clock::now();
       auto search_dur = std::chrono::duration_cast<std::chrono::microseconds>(search_end - search_start);
       d->tot_read_time += search_dur.count();
-	    d->tot_reads++;
+        d->tot_reads++;
 #endif
     }
     else if (action > d->search_frac && action <= (d->search_frac + d->insert_frac)){
       // Insert Operation
-	    
+        
       bool slowOpn = false;
-		
+        
 #ifdef DETAILED_STATS
     auto ins_start = std::chrono::high_resolution_clock::now();
-#endif	
-		
-		 slowOpn = insert(d,key);
-		
+#endif    
+        
+         slowOpn = insert(d,key);
+        
 #ifdef DETAILED_STATS
-		  auto ins_end = std::chrono::high_resolution_clock::now();
-	    auto ins_dur = std::chrono::duration_cast<std::chrono::microseconds>(ins_end - ins_start);
-		  if(slowOpn){
-			  d->tot_slowins_time += ins_dur.count();
-			  d->tot_slowins_count++;
-		  }
-		  else{
-			  d->tot_fastins_time += ins_dur.count();
-			  d->tot_fastins_count++;
-		  }
-#endif	
+          auto ins_end = std::chrono::high_resolution_clock::now();
+        auto ins_dur = std::chrono::duration_cast<std::chrono::microseconds>(ins_end - ins_start);
+          if(slowOpn){
+              d->tot_slowins_time += ins_dur.count();
+              d->tot_slowins_count++;
+          }
+          else{
+              d->tot_fastins_time += ins_dur.count();
+              d->tot_fastins_count++;
+          }
+#endif    
     }
     else{
       // Delete Operation
@@ -335,43 +339,43 @@ restart:
 #ifdef DETAILED_STATS
       auto del_start = std::chrono::high_resolution_clock::now();
 #endif
-		
+        
       slowOpn = delete_node(d,key);
 #ifdef DETAILED_STATS
-	    auto del_end = std::chrono::high_resolution_clock::now();
-	    auto del_dur = std::chrono::duration_cast<std::chrono::microseconds>(del_end - del_start);
-		  if(slowOpn){
-			  d->tot_slowdel_time += del_dur.count();
-			  d->tot_slowdel_count++;
-		  }
-		  else{
-			  d->tot_fastdel_time += del_dur.count();
-			  d->tot_fastdel_count++;
-		  }	
+        auto del_end = std::chrono::high_resolution_clock::now();
+        auto del_dur = std::chrono::duration_cast<std::chrono::microseconds>(del_end - del_start);
+          if(slowOpn){
+              d->tot_slowdel_time += del_dur.count();
+              d->tot_slowdel_count++;
+          }
+          else{
+              d->tot_fastdel_time += del_dur.count();
+              d->tot_fastdel_count++;
+          }    
 #endif
     }
     d->ops++;
   }
 
-#if PREPROCESSING	
-	if(!prepop){
-	
-		barrier_cross(d->barrier2);
-	}
-	
-	
-	if(stop2 == 1){
-		if(prepop){
-			//Done.
-			return NULL;
-		}
-		else{
-			prepop = true;
-			d->ops = 0;
-		}
-	
-	}
-	goto restart; 
+#if PREPROCESSING    
+    if(!prepop){
+    
+        barrier_cross(d->barrier2);
+    }
+    
+    
+    if(stop2 == 1){
+        if(prepop){
+            //Done.
+            return NULL;
+        }
+        else{
+            prepop = true;
+            d->ops = 0;
+        }
+    
+    }
+    goto restart; 
 #endif
 
   return NULL;
@@ -452,7 +456,7 @@ int main(int argc, char **argv)
               "        Number of threads (default=" XSTR(DEFAULT_NB_THREADS) ")\n"
               "  -s, --seed <int>\n"
               "        RNG seed (0=time-based, default=" XSTR(DEFAULT_SEED) ")\n"
-	            "  -r, --search-fraction <int>\n"
+                "  -r, --search-fraction <int>\n"
               "        Number of search Threads (default=" XSTR(DEFAULT_SEARCH_FRAC) ")\n"
               "  -i, --insert-update-fraction <int>\n"
               "        Number of insert/update Threads (default=" XSTR(DEFAULT_INSERT_FRAC) ")\n"
@@ -497,7 +501,7 @@ int main(int argc, char **argv)
   printf("Duration       : %d\n", duration);
   printf("Nb threads     : %d\n", nb_threads);
   printf("Seed           : %d\n", seed);
-  printf("Search frac    : %f\n", search_frac); 	
+  printf("Search frac    : %f\n", search_frac);     
   printf("Insert frac    : %f\n", insert_frac);
   printf("Delete frac    : %f\n", delete_frac);
   printf("Keyspace1 size : %ld\n", keyspace1_size);
@@ -540,7 +544,7 @@ node_t * newRT = new node_t;
 
   //Pre-populate Tree-------------------------------------------------
   int pre_inserts = 2;
-	int i1 = 0;
+    int i1 = 0;
   data[i1].id = i1+1;
   data[i1].numThreads = nb_threads;
   data[i1].numInsert = 0;
@@ -568,25 +572,25 @@ node_t * newRT = new node_t;
    data[i1].count = 0;
 #endif
   
-	
-	data[i1].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
+    
+    data[i1].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
   data[i].sr = new seekRecord_t;
   data[i].ssr = new seekRecord_t;
-    	
+        
   Word key;
   
   while(data[0].numInsert < (keyspace1_size/2)){
-	  key = rand_r(&data[0].seed) % (keyspace1_size);
-	  while(key == 0){
+      key = rand_r(&data[0].seed) % (keyspace1_size);
+      while(key == 0){
       // Dont allow a key of 0 in the tree
-	    key = rand_r(&data[0].seed) % (keyspace1_size);
-	  } 
-		insert(&data[i1],key);
+        key = rand_r(&data[0].seed) % (keyspace1_size);
+      } 
+        insert(&data[i1],key);
   } 
   pre_inserts+= data[0].numInsert; 
-    		
+            
   //------------------------------------------------------------------- 
-  std::cout << "pre_inserts = " << pre_inserts << std::endl; 	
+  std::cout << "pre_inserts = " << pre_inserts << std::endl;     
   
   barrier_init(barrier, nb_threads + 1);
   barrier_init(barrier2, nb_threads + 1);
@@ -612,7 +616,7 @@ node_t * newRT = new node_t;
     data[i].ssr = new seekRecord_t;
     data[i].buffer = lc;
    
-#ifdef DETAILED_STATS	 
+#ifdef DETAILED_STATS     
     data[i].tot_reads = 0;
     data[i].tot_read_time = 0;
     data[i].tot_reads = 0;
@@ -627,10 +631,10 @@ node_t * newRT = new node_t;
     data[i].insertSeqNumber = 0;
     data[i].count = 0;
 #endif
-	  
+      
     if (pthread_create(&threads[i], &attr, testRW, (void *)(&data[i])) != 0) {
       fprintf(stderr, "Error creating thread\n");
-    	exit(1);
+        exit(1);
     }
   }
   
@@ -658,40 +662,40 @@ node_t * newRT = new node_t;
     in_order_visit(newRT);
     if((leafNodes > ((1.05)*(insert_frac*keyspace1_size)/(insert_frac+delete_frac))) || 
         (leafNodes < ((0.95)*(insert_frac*keyspace1_size)/(insert_frac+delete_frac)))){
-	    //  Not yet within steady state limits. Let it run again.
-	    // Wait until all worker threads reach barrier2
-	    while(barrier_peek(barrier2)){
-	      pthread_yield();
-	    }
-  	  AO_store_full(&stop, 0);
-  	  barrier_cross(barrier2);
+        //  Not yet within steady state limits. Let it run again.
+        // Wait until all worker threads reach barrier2
+        while(barrier_peek(barrier2)){
+          pthread_yield();
+        }
+        AO_store_full(&stop, 0);
+        barrier_cross(barrier2);
     }
     else{
-    	// prepopulation done
-    	
-    	AO_store_full(&stop2, 1);
-	    // Wait until all worker threads reach barrier2
-	    while(barrier_peek(barrier2)){
-	      pthread_yield();
-    	}
-	    AO_store_full(&stop, 0);    	
-	    barrier_cross(barrier2);
-    	startsim = true;
-    }	
+        // prepopulation done
+        
+        AO_store_full(&stop2, 1);
+        // Wait until all worker threads reach barrier2
+        while(barrier_peek(barrier2)){
+          pthread_yield();
+        }
+        AO_store_full(&stop, 0);        
+        barrier_cross(barrier2);
+        startsim = true;
+    }    
  } 
  #endif  
     
   barrier_cross(barrier);
   gettimeofday(&start, NULL);
   if (duration > 0) {
-	  nanosleep(&timeout, NULL);
+      nanosleep(&timeout, NULL);
   } 
   else {
     sigemptyset(&block_set);
     sigsuspend(&block_set);
   }
   
-  AO_store_full(&stop, 1);	
+  AO_store_full(&stop, 1);    
   gettimeofday(&end, NULL);
   
   /* Wait for thread completion */
@@ -703,7 +707,7 @@ node_t * newRT = new node_t;
   } 
   
   // CONSISTENCY CHECK
-  leafNodes = 0;	
+  leafNodes = 0;    
   long rootkey =  in_order_visit((newRT));
   unsigned long tot_inserts = 0;
   unsigned long tot_deletes = 0;
@@ -721,45 +725,45 @@ node_t * newRT = new node_t;
   unsigned long tot_fastdel_count = 0;
   unsigned long tot_slowdel_count = 0;
   uint64_t inscases = 0;
-	uint64_t inswin = 0;
+    uint64_t inswin = 0;
 #endif
 
   for(int i = 0; i < nb_threads; i++){
- 	  tot_inserts += data[i].numInsert;
-   	tot_deletes += data[i].numActualDelete;
-   	
-   	tot_ops += data[i].ops;
-   	
+       tot_inserts += data[i].numInsert;
+       tot_deletes += data[i].numActualDelete;
+       
+       tot_ops += data[i].ops;
+       
 #ifdef DETAILED_STATS
-   	tot_reads += data[i].tot_reads;
-   	tot_read_time += (data[i].tot_read_time);
-   	
-   	tot_fastins_time += (data[i].tot_fastins_time);
-   	tot_slowins_time += (data[i].tot_slowins_time);
-   	
+       tot_reads += data[i].tot_reads;
+       tot_read_time += (data[i].tot_read_time);
+       
+       tot_fastins_time += (data[i].tot_fastins_time);
+       tot_slowins_time += (data[i].tot_slowins_time);
+       
     tot_fastdel_time += (data[i].tot_fastdel_time);
-   	tot_slowdel_time += (data[i].tot_slowdel_time);
-   	
-   	tot_fastins_count += data[i].tot_fastins_count; 
-   	tot_slowins_count += data[i].tot_slowins_count;
-   	 
-   	tot_fastdel_count += data[i].tot_fastdel_count; 
-   	tot_slowdel_count += data[i].tot_slowdel_count;
+       tot_slowdel_time += (data[i].tot_slowdel_time);
+       
+       tot_fastins_count += data[i].tot_fastins_count; 
+       tot_slowins_count += data[i].tot_slowins_count;
+        
+       tot_fastdel_count += data[i].tot_fastdel_count; 
+       tot_slowdel_count += data[i].tot_slowdel_count;
 #endif
-	
+    
   }
    
   tot_inserts+= pre_inserts;
   unsigned long tot_updates = 0;
   for(int i = 0; i < nb_threads; i++){
- 	  tot_updates += data[i].ops;
+       tot_updates += data[i].ops;
   }
   std::cout << "Total Number of Nodes ( " << tot_inserts << ", " << tot_deletes << " ) = " << tot_inserts - tot_deletes << std::endl;
   std::cout << "Total Number of leaf nodes (sanity check) = " << leafNodes << std::endl;
    
   if((tot_inserts - tot_deletes) != leafNodes){
     std::cout << "ERROR. MISMATCH" << std::endl;
-   	exit(0);
+       exit(0);
    } 
    
   duration = (end.tv_sec * 1000 + end.tv_usec / 1000) - (start.tv_sec * 1000 + start.tv_usec / 1000);
