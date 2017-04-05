@@ -225,9 +225,7 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
     // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
     result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val2, (volatile void*)R->lumC, (volatile void*)newWord);
   }
-  if (result) {
-    EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->lumC), NULL, NULL, finalize_node);
-  }
+
   return result;    
 }
 

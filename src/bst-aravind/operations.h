@@ -315,9 +315,6 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
              // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
         }
-        if (result) {
-        	EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->lumC), NULL, NULL, finalize_node);
-        }
         return result; 
         
     }
@@ -345,9 +342,6 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
             result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
         }
         
-        if (result) {
-        	EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->lumC), NULL, NULL, finalize_node);
-        }
     return result; 
     }    
         
@@ -455,6 +449,9 @@ bool delete_node(thread_data_t * data, long key){
             int res = perform_one_delete_window_operation(data, R, key);
             
             if(res == 1){
+                // reclaim parent and leaf nodes
+                EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->pL), NULL, NULL, finalize_node);
+                EpochReclaimObject(data->epoch, (node_t *)(R->parent), NULL, NULL, finalize_node);
                 // operation successfully executed.
                 EpochEnd(data->epoch);
                 return true;
@@ -478,6 +475,9 @@ bool delete_node(thread_data_t * data, long key){
                     res = perform_one_delete_window_operation(data, R, key);
                     
                     if(res == 1){
+                        // reclaim parent and leaf nodes
+                        EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->pL), NULL, NULL, finalize_node);
+                        EpochReclaimObject(data->epoch, (node_t *)(R->parent), NULL, NULL, finalize_node);
                     	EpochEnd(data->epoch);
                         return true;
                     }
