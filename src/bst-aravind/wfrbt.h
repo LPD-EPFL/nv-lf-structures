@@ -7,6 +7,11 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <vector>
+#include <link-cache.h>
+#include <active-page-table.h>
+#include <nv_memory.h>
+#include <nv_utils.h>
+#include <epoch.h>
 
 #include "atomic_ops.h"
 #include "standard_ao_double_t.h"
@@ -66,10 +71,12 @@ typedef struct thread_data {
   node_t* rootOfTree;
   barrier_t *barrier;
   barrier_t *barrier2;
-  std::vector<node_t *> recycledNodes;
+  // std::vector<node_t *> recycledNodes;
   seekRecord_t * sr; // seek record
   seekRecord_t * ssr; // secondary seek record
   linkcache_t* buffer;
+  active_page_table_t* page_table;
+  EpochThread epoch;
 
 #ifdef DETAILED_STATS    
   double tot_read_time; 

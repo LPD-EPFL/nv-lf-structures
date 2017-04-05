@@ -133,7 +133,7 @@ test(void* thread)
     
   seeds = seed_rand();
     
-    EpochThread epoch = EpochThreadInit(ID);
+  EpochThread epoch = EpochThreadInit(ID);
 	td->page_table = (active_page_table_t*)GetOpaquePageBuffer(epoch);
 
   barrier_cross(&barrier);

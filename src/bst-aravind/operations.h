@@ -8,6 +8,11 @@
 
 typedef volatile void* VPVOID; 
 
+// callback from Epoch allocator
+void finalize_node(void * node, void * context, void* tls) {
+  EpochFreeNode(node);
+}
+
 seekRecord_t * insseek(thread_data_t * data, long key, int op){
     
     node_t * gpar = NULL; // last node (ancestor of parent on access path) whose child pointer field is unmarked
@@ -252,7 +257,7 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
 }
 
 bool search(thread_data_t * data, long key){
-    
+    EpochStart(data->epoch);
     node_t * cur = (node_t *)get_addr_for_reading(data->rootOfTree->child.AO_val1);
     long lastKey;    
     while(cur != NULL){
@@ -263,7 +268,8 @@ bool search(thread_data_t * data, long key){
 #ifdef BUFFERING_ON
     cache_scan(data->buffer, key);
 #endif
-  return (key == lastKey);
+    EpochEnd(data->epoch);
+  	return (key == lastKey);
 }
 
 
@@ -300,7 +306,7 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
         }
         
         int result;
-        
+        EpochDeclareUnlinkNode(data->epoch, (void*)R->lumC, sizeof(node_t));
         if(R->isLeftUM){
              // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val1, (VPVOID)R->lumC, (VPVOID)newWord);
@@ -309,7 +315,9 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
              // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
         }
-        
+        if (result) {
+        	EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->lumC), NULL, NULL, finalize_node);
+        }
         return result; 
         
     }
@@ -327,7 +335,7 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
         }
         
         int result;
-        
+        EpochDeclareUnlinkNode(data->epoch, (void*)R->lumC, sizeof(node_t));
         if(R->isLeftUM){
              // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val1, (VPVOID)R->lumC, (VPVOID)newWord);
@@ -337,6 +345,9 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
             result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
         }
         
+        if (result) {
+        	EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->lumC), NULL, NULL, finalize_node);
+        }
     return result; 
     }    
         
@@ -370,9 +381,12 @@ int inject(thread_data_t * data, seekRecord_t * R, int op){
 }
 
 bool insert(thread_data_t * data, long key){
-  int injectResult;
-  int fasttry = 0;    
-    
+
+	  
+	int injectResult;
+	int fasttry = 0;    
+    EpochStart(data->epoch);
+
     while(true){
         seekRecord_t * R = insseek(data, key, INS);
         fasttry++;
@@ -381,9 +395,11 @@ bool insert(thread_data_t * data, long key){
 #ifdef BUFFERING_ON
                 cache_scan(data->buffer, key);
 #endif
+                EpochEnd(data->epoch);
                 return false;
             }
             else{
+            	EpochEnd(data->epoch);
                 return true;
             }    
         }
@@ -398,7 +414,7 @@ bool insert(thread_data_t * data, long key){
         
         if(injectResult == 1){
             // Operation injected and executed
-            
+            EpochEnd(data->epoch);
             return true;
         }
         
@@ -407,6 +423,7 @@ bool insert(thread_data_t * data, long key){
 } 
 
 bool delete_node(thread_data_t * data, long key){
+    EpochStart(data->epoch);
     int injectResult;
     
     while(true){
@@ -416,6 +433,7 @@ bool delete_node(thread_data_t * data, long key){
 #ifdef BUFFERING_ON
             cache_scan(data->buffer, key);
 #endif
+            EpochEnd(data->epoch);
             return false;
         }
         
@@ -423,8 +441,7 @@ bool delete_node(thread_data_t * data, long key){
         
         if(!is_free(R->pL)){
             
-                help_conflicting_operation(data, R);
-            
+            help_conflicting_operation(data, R);
             continue;
         }
         
@@ -439,6 +456,7 @@ bool delete_node(thread_data_t * data, long key){
             
             if(res == 1){
                 // operation successfully executed.
+                EpochEnd(data->epoch);
                 return true;
             }
             else{
@@ -453,12 +471,14 @@ bool delete_node(thread_data_t * data, long key){
 #ifdef BUFFERING_ON
                         cache_scan(data->buffer, key);
 #endif
+                        EpochEnd(data->epoch);
                         return false;
                     }
                     
                     res = perform_one_delete_window_operation(data, R, key);
                     
                     if(res == 1){
+                    	EpochEnd(data->epoch);
                         return true;
                     }
                 }

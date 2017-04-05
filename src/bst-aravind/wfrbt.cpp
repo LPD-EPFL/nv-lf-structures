@@ -77,7 +77,6 @@ timespec t;
 long leafNodes = 0;
 
 
-
 /* ################################################################### *
  * Correctness Checking
  * ################################################################### */
@@ -116,20 +115,23 @@ long in_order_visit(node_t * rootNode){
 
 /*************************************************************************************************/
 int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, long newKey){
+  
   node_t *newInt ;
-    node_t *newLeaf;
-  if(data->recycledNodes.empty()){
-      node_t * allocedNodeArr =(node_t *)malloc(2*sizeof(node_t));// new pointerNode_t[2];
-    newInt = &allocedNodeArr[0];
-    newLeaf = &allocedNodeArr[1]; 
-  }
-  else{ 
-    // reuse memory of previously allocated nodes.
-    newInt = data->recycledNodes.back();
-    data->recycledNodes.pop_back();
-    newLeaf = data->recycledNodes.back();
-    data->recycledNodes.pop_back();
-  }
+  node_t *newLeaf;
+  // if(data->recycledNodes.empty()){
+  //     node_t * allocedNodeArr =(node_t *)malloc(2*sizeof(node_t));// new pointerNode_t[2];
+  //   newInt = &allocedNodeArr[0];
+  //   newLeaf = &allocedNodeArr[1]; 
+  // }
+  // else{ 
+  //   // reuse memory of previously allocated nodes.
+  //   newInt = data->recycledNodes.back();
+  //   data->recycledNodes.pop_back();
+  //   newLeaf = data->recycledNodes.back();
+  //   data->recycledNodes.pop_back();
+  // }
+  newInt = (node_t*)EpochAllocNode(data->epoch, sizeof(node_t));
+  newLeaf = (node_t*)EpochAllocNode(data->epoch, sizeof(node_t));
         
   newLeaf->child.AO_val1 = 0;
   newLeaf->child.AO_val2 = 0;
@@ -137,6 +139,8 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
 
   write_data_wait((void*) newInt, CACHE_LINES_PER_NV_NODE);      
   write_data_nowait((void*) newLeaf, CACHE_LINES_PER_NV_NODE);
+  
+  _mm_sfence();
     
   node_t * existLeaf = (node_t *)get_addr_for_reading(R->pL);
   long existKey = R->leafKey;
@@ -176,8 +180,10 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
   }
   else{
     // reuse data and pointer nodes
-    data->recycledNodes.push_back(newInt);
-    data->recycledNodes.push_back(newLeaf);
+    // data->recycledNodes.push_back(newInt);
+    // data->recycledNodes.push_back(newLeaf);
+
+    // TODO: free nodes
     return 0; 
   }
 }
@@ -209,7 +215,8 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
   }
         
   int result;
-        
+  
+  EpochDeclareUnlinkNode(data->epoch, (void*)R->lumC, sizeof(node_t));
   if(R->isLeftUM){
     // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
     result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val1, (volatile void*)R->lumC, (volatile void*)newWord);
@@ -218,7 +225,9 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
     // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
     result = cache_try_link_and_add(data->buffer, key, (volatile void**)&R->lum->child.AO_val2, (volatile void*)R->lumC, (volatile void*)newWord);
   }
-
+  if (result) {
+    EpochReclaimObject(data->epoch, (node_t *)get_addr_for_reading(R->lumC), NULL, NULL, finalize_node);
+  }
   return result;    
 }
 
@@ -280,6 +289,10 @@ void *testRW(void *data)
 #if PREPROCESSING  
    bool prepop = false;
 #endif
+
+  d->epoch = EpochThreadInit(d->id);
+  
+  d->page_table = (active_page_table_t*)GetOpaquePageBuffer(d->epoch);
 
   /* Wait on barrier */
 restart:  
@@ -376,6 +389,10 @@ restart:
     
     }
     goto restart; 
+#endif
+
+#ifndef ESTIMATE_RECOVERY
+  EpochThreadShutdown(d->epoch);
 #endif
 
   return NULL;
@@ -511,8 +528,10 @@ int main(int argc, char **argv)
   timeout.tv_nsec = (duration % 1000) * 1000000;
   
   
-  data = new thread_data_t[nb_threads];
+  data = new thread_data_t[nb_threads+1];
   linkcache_t* lc = cache_create();
+  EpochGlobalInit(lc);
+  EpochThread epoch = EpochThreadInit(0);
 
   if ((threads = (pthread_t *)malloc(nb_threads * sizeof(pthread_t))) == NULL) {
     perror("malloc");
@@ -544,7 +563,7 @@ node_t * newRT = new node_t;
 
   //Pre-populate Tree-------------------------------------------------
   int pre_inserts = 2;
-    int i1 = 0;
+  int i1 = nb_threads;
   data[i1].id = i1+1;
   data[i1].numThreads = nb_threads;
   data[i1].numInsert = 0;
@@ -558,6 +577,7 @@ node_t * newRT = new node_t;
   data[i1].rootOfTree = newRT;
   data[i1].barrier = barrier;
   data[i1].buffer = lc;
+  data[i1].epoch = epoch;
     
 #ifdef DETAILED_STATS
    data[i1].tot_reads = 0;
@@ -573,13 +593,13 @@ node_t * newRT = new node_t;
 #endif
   
     
-    data[i1].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
-  data[i].sr = new seekRecord_t;
-  data[i].ssr = new seekRecord_t;
+    // data[i1].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
+  data[i1].sr = new seekRecord_t;
+  data[i1].ssr = new seekRecord_t;
         
   Word key;
   
-  while(data[0].numInsert < (keyspace1_size/2)){
+  while(data[i1].numInsert < (keyspace1_size/2)){
       key = rand_r(&data[0].seed) % (keyspace1_size);
       while(key == 0){
       // Dont allow a key of 0 in the tree
@@ -587,7 +607,7 @@ node_t * newRT = new node_t;
       } 
         insert(&data[i1],key);
   } 
-  pre_inserts+= data[0].numInsert; 
+  pre_inserts+= data[i1].numInsert; 
             
   //------------------------------------------------------------------- 
   std::cout << "pre_inserts = " << pre_inserts << std::endl;     
@@ -611,7 +631,7 @@ node_t * newRT = new node_t;
     data[i].rootOfTree = newRT;
     data[i].barrier = barrier;
     data[i].barrier2 = barrier2;
-    data[i].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
+    // data[i].recycledNodes.reserve(RECYCLED_VECTOR_RESERVE);
     data[i].sr = new seekRecord_t;
     data[i].ssr = new seekRecord_t;
     data[i].buffer = lc;
@@ -792,6 +812,10 @@ node_t * newRT = new node_t;
   std::cout << "Avg. Fast Delete Time(usec) = " << tot_fastdel_time/tot_fastdel_count<< std::endl;
 #endif
   
+#ifndef ESTIMATE_RECOVERY
+  EpochThreadShutdown(epoch);
+#endif
+
   free(threads);
   delete [] data;
   return 0;
