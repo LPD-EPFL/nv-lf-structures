@@ -394,15 +394,24 @@ retry:
 //write_data_wait((void*)&(preds[0]->next[0]), 1);
 #endif
 
+volatile node_t* new_next;
 
 for (i = 1; i < to_insert->toplevel; i++) {
 	while (1) {
 		pred = preds[i];
 		succ = succs[i];
-		if (PTR_IS_MARKED(to_insert->next[i])) {
+
+        new_next = to_insert->next[i];
+		if (PTR_IS_MARKED(new_next)) {
 			EpochEnd(epoch);
 			return 1;
 		}
+
+        //tentative fix for problematic case in the original fraser algorithm
+        if ((succ != new_next) && (CAS_PTR(&(to_insert->next[i]), new_next, succ)!= new_next)) {
+            EpochEnd(epoch);
+            return 1;
+        }
 
 		if (CAS_PTR((PVOID*)&pred->next[i], (PVOID) succ, (PVOID)to_insert) == succ) {
 #ifdef SIMULATE_NAIVE_IMPLEMENTATION
