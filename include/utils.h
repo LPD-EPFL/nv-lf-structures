@@ -679,7 +679,7 @@ static __attribute__ ((unused)) double eng_per_test_iter_nj[40][5] =
   //debugging functions
 #ifdef DEBUG
 #  define DPRINT(args...) fprintf(stderr,args);
-#  define DDPRINT(fmt, args...) printf("%s:%s:%d: "fmt, __FILE__, __FUNCTION__, __LINE__, args)
+#  define DDPRINT(fmt, args...) printf("%s:%s:%d: " fmt, __FILE__, __FUNCTION__, __LINE__, args)
 #else
 #  define DPRINT(...)
 #  define DDPRINT(fmt, ...)

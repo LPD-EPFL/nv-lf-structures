@@ -7,11 +7,15 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <vector>
+
 #include <link-cache.h>
 #include <active-page-table.h>
 #include <nv_memory.h>
 #include <nv_utils.h>
 #include <epoch.h>
+#include "common.h"
+#include "random.h"
+#include "lf-common.h"
 
 #include "atomic_ops.h"
 #include "standard_ao_double_t.h"
@@ -49,12 +53,12 @@ typedef struct seekRecord{
   bool isLeftUM; // is  last unmarked node's child on access path the left child of  the last unmarked node?
 } seekRecord_t;
 
-typedef struct barrier {
-  pthread_cond_t complete;
-  pthread_mutex_t mutex;
-  int count;
-  int crossing;
-} barrier_t;
+// typedef struct barrier {
+//   pthread_cond_t complete;
+//   pthread_mutex_t mutex;
+//   int count;
+//   int crossing;
+// } barrier_t;
 
 
 typedef struct thread_data {

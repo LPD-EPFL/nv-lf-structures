@@ -12,7 +12,7 @@ all: wfrbt.o wfrbt
 
 VERSION = TCMALLOC_NO_UPDATE
 
-CC = g++ -std=gnu++0x
+CPPC = g++ -std=gnu++0x
 
 ifeq "$(VERSION)" "MALLOC_UPDATE"
 CFLAGS += -lpthread -lrt -DUPDATEVAL
@@ -30,11 +30,14 @@ endif
 
 CFLAGS += -I/home/zablotch/local/include/ -I/home/zablotch/local/include/atomic_ops -I/home/zablotch/local/include/atomic_ops/sysdeps
 
-wfrbt.o: wfrbt.h wfrbt.cpp
-	$(CC) $(CFLAGS) -c -o $(BUILDIR)/wfrbt.o wfrbt.cpp
+measurements.o:
+	$(CC) $(CFLAGS) -c -o $(BUILDIR)/measurements.o $(PROF)/measurements.c
 
-wfrbt: wfrbt.o
-	$(CC) $(CFLAGS) $(BUILDIR)/wfrbt.o -o $(BINS) $(LDFLAGS)
+wfrbt.o: measurements.o wfrbt.h wfrbt.cpp
+	$(CPPC) $(CFLAGS) -c -o $(BUILDIR)/wfrbt.o wfrbt.cpp
+
+wfrbt: measurements.o wfrbt.o
+	$(CPPC) $(CFLAGS) $(BUILDIR)/measurements.o $(BUILDIR)/wfrbt.o -o $(BINS) $(LDFLAGS)
 
 
 clean:

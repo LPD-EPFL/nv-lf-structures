@@ -48,12 +48,11 @@ Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees
  */
 
 #define PREPROCESSING 0
- 
+#define ESTIMATE_RECOVERY 1
+
 #define RO                              1
 #define RW                              0
 
-#define DEFAULT_DURATION                2000
-#define DEFAULT_NB_THREADS              20
 #define DEFAULT_SEED                    0
 #define DEFAULT_SEARCH_FRAC             0.0
 #define DEFAULT_INSERT_FRAC             0.5
@@ -234,44 +233,44 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, l
  * BARRIER
  * ################################################################### */
 
-void barrier_init(barrier_t *b, int n)
-{
-  pthread_cond_init(&b->complete, NULL);
-  pthread_mutex_init(&b->mutex, NULL);
-  b->count = n;
-  b->crossing = 0;
-}
+// void barrier_init(barrier_t *b, int n)
+// {
+//   pthread_cond_init(&b->complete, NULL);
+//   pthread_mutex_init(&b->mutex, NULL);
+//   b->count = n;
+//   b->crossing = 0;
+// }
 
-void barrier_cross(barrier_t *b)
-{
-  pthread_mutex_lock(&b->mutex);
-  /* One more thread through */
-  b->crossing++;
-  /* If not all here, wait */
-  if (b->crossing < b->count) {
-    pthread_cond_wait(&b->complete, &b->mutex);
-  } else {
-    pthread_cond_broadcast(&b->complete);
-    /* Reset for next time */
-    b->crossing = 0;
-  }
-  pthread_mutex_unlock(&b->mutex);
-}
+// void barrier_cross(barrier_t *b)
+// {
+//   pthread_mutex_lock(&b->mutex);
+//   /* One more thread through */
+//   b->crossing++;
+//   /* If not all here, wait */
+//   if (b->crossing < b->count) {
+//     pthread_cond_wait(&b->complete, &b->mutex);
+//   } else {
+//     pthread_cond_broadcast(&b->complete);
+//     /* Reset for next time */
+//     b->crossing = 0;
+//   }
+//   pthread_mutex_unlock(&b->mutex);
+// }
 
-#ifdef PREPROCESSING
-bool barrier_peek(barrier_t *b)
-{
-  pthread_mutex_lock(&b->mutex);
-  if (b->crossing == (b->count - 1)) {
-    // all threads except the main thread have reached it.
- pthread_mutex_unlock(&b->mutex);
-    return false;
-  } else { 
- pthread_mutex_unlock(&b->mutex);
-    return true;
-  }
-}
-#endif
+// #ifdef PREPROCESSING
+// bool barrier_peek(barrier_t *b)
+// {
+//   pthread_mutex_lock(&b->mutex);
+//   if (b->crossing == (b->count - 1)) {
+//     // all threads except the main thread have reached it.
+//  pthread_mutex_unlock(&b->mutex);
+//     return false;
+//   } else { 
+//  pthread_mutex_unlock(&b->mutex);
+//     return true;
+//   }
+// }
+// #endif
 
 /* ################################################################### *
  * TEST
@@ -810,8 +809,42 @@ node_t * newRT = new node_t;
   std::cout << "Avg. Fast Delete Time(usec) = " << tot_fastdel_time/tot_fastdel_count<< std::endl;
 #endif
   
-#ifndef ESTIMATE_RECOVERY
+  ticks recovery_cycles = 0;
+
+#ifdef ESTIMATE_RECOVERY
+  active_page_table_t** page_tables = (active_page_table_t**)malloc(sizeof(active_page_table_t*) * (nb_threads));
+  for (ULONG i = 0; i < nb_threads; i++) {
+    page_tables[i] = data[i].page_table;
+    fprintf(stderr, "page table %d has %u pages\n", i, page_tables[i]->current_size);
+#ifdef DO_STATS
+    fprintf(stderr, "marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
+#endif
+  }
+  //page_tables[nb_threads] = (active_page_table_t*)GetOpaquePageBuffer(epoch);
+  //fprintf(stderr, "page table %d has %u pages\n", args->threadCount, page_buffers[args->threadCount]->current_size);
+//#ifdef DO_STATS
+  //fprintf(stderr, "marks %u, hits %u\n", page_buffers[args->threadCount]->num_marks, page_buffers[args->threadCount]->hits);
+//#endif
+  volatile ticks corr = getticks_correction_calc();
+  ticks startCycles = getticks();
+  recover(&data[nb_threads], page_tables, nb_threads);
+  ticks endCycles = getticks();
+
+  recovery_cycles = endCycles - startCycles + corr;
+  free(page_tables);
+  active_page_table_t* pb = create_active_page_table(nb_threads+1);
+
+  SetOpaquePageBuffer(epoch, pb);
+#else
   EpochThreadShutdown(epoch);
+#endif
+
+#define LLU long long unsigned int
+  printf("Recovery takes (cycles): %llu\n", (LLU)recovery_cycles);
+
+
+#ifdef ESTIMATE_RECOVERY
+  destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
 #endif
 
   free(threads);
