@@ -1,12 +1,12 @@
 .PHONY:	all
 
-LFS = src/skiplist src/linkedlist src/bst src/bst-aravind
+LFS = src/skiplist src/linkedlist src/bst src/bst-aravind src/hashtable
 
 .PHONY:	clean all $(LFS)
 
-default: linkedlist skiplist bst bst-aravind $(LFS)
+default: linkedlist skiplist bst bst-aravind hashtable $(LFS)
 
-all:	linkedlist skiplist bst bst-aravind $(LFS)
+all:	linkedlist skiplist bst bst-aravind hashtable $(LFS)
 
 
 linkedlist:
@@ -21,10 +21,15 @@ bst:
 bst-aravind:
 	$(MAKE) -B -C src/bst-aravind
 
+hashtable:
+	$(MAKE) -B -C src/hashtable
+
+
 clean:
 	$(MAKE) -B -C src/skiplist clean
 	$(MAKE) -B -C src/linkedlist clean
 	$(MAKE) -B -C src/bst clean
 	$(MAKE) -B -C src/bst-aravind clean
+	$(MAKE) -B -C src/hashtable clean
 	rm -rf build
 
