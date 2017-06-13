@@ -47,8 +47,10 @@
 
 RETRY_STATS_VARS_GLOBAL;
 
+unsigned int maxhtlength;
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
+size_t load_factor = DEFAULT_LOAD;
 size_t update = DEFAULT_UPDATE;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
@@ -242,6 +244,7 @@ main(int argc, char **argv)
     {"num-buckets",               required_argument, NULL, 'b'},
     {"print-vals",                required_argument, NULL, 'v'},
     {"vals-pf",                   required_argument, NULL, 'f'},
+    {"load-factor",               required_argument, NULL, 'l'},
     {NULL, 0, NULL, 0}
   };
 
@@ -249,7 +252,7 @@ main(int argc, char **argv)
   while(1) 
     {
       i = 0;
-      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:p:b:v:f:", long_options, &i);
+      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:", long_options, &i);
 		
       if(c == -1)
 	break;
@@ -282,6 +285,8 @@ main(int argc, char **argv)
 		 "        Range of integer values inserted in set\n"
 		 "  -u, --update-rate <int>\n"
 		 "        Percentage of update transactions\n"
+     "  -l, --load-factor <int>\n"
+     "        Elements per bucket\n"
 		 "  -p, --put-rate <int>\n"
 		 "        Percentage of put update transactions (should be less than percentage of updates)\n"
 		 "  -b, --num-buckets <int>\n"
@@ -310,6 +315,9 @@ main(int argc, char **argv)
 	case 'p':
 	  put_explicit = 1;
 	  put = atoi(optarg);
+    break;
+  case 'l':
+    load_factor = atoi(optarg);
 	  break;
 	case 'v':
 	  print_vals_num = atoi(optarg);
@@ -337,7 +345,7 @@ main(int argc, char **argv)
       range = 2 * initial;
     }
 
-  printf("## Initial: %zu / Range: %zu /\n", initial, range);
+  printf("## Initial: %zu / Range: %zu / Load factor: %zu\n", initial, range, load_factor);
 
   double kb = initial * sizeof(DS_NODE) / 1024.0;
   double mb = kb / 1024.0;
@@ -385,6 +393,8 @@ main(int argc, char **argv)
   timeout.tv_nsec = (duration % 1000) * 1000000;
     
   stop = 0;
+
+  maxhtlength = (unsigned int) initial / load_factor;
 
 
 	linkcache_t* lc = cache_create();
