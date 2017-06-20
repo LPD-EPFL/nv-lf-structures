@@ -67,31 +67,80 @@ int floor_log_2(unsigned int n) {
   return ((n == 0) ? (-1) : pos);
 }
 
+// ht_intset_t* 
+// ht_new(EpochThread epoch) 
+// {
+//   ht_intset_t *set;
+//   int i;
+	
+//   if ((set = (ht_intset_t *)malloc(sizeof(ht_intset_t))) == NULL)
+//     {
+//       perror("malloc");
+//       exit(1);
+//     }  
+
+//   set->hash = maxhtlength - 1;
+
+//   size_t bs = (maxhtlength + 1) * sizeof(linkedlist_t);
+//   bs += CACHE_LINE_SIZE - (bs & CACHE_LINE_SIZE);
+//   if ((set->buckets = (linkedlist_t*)malloc(bs)) == NULL)
+//     {
+//       perror("malloc");
+//       exit(1);
+//     }  
+
+//   for (i = 0; i < maxhtlength; i++) 
+//     {
+//       bucket_set_init(&set->buckets[i], epoch);
+//     }
+//   return set;
+// }
+
+
 ht_intset_t* 
 ht_new(EpochThread epoch) 
 {
-  ht_intset_t *set;
-  int i;
-	
-  if ((set = (ht_intset_t *)malloc(sizeof(ht_intset_t))) == NULL)
-    {
-      perror("malloc");
-      exit(1);
-    }  
+  PMEMobjpool *pop = NULL;
 
-  set->hash = maxhtlength - 1;
+  char path[32];  
+  sprintf(path, "/tmp/ht_pool"); 
+
+  //remove file if it exists
+  //TODO might want to remove this instruction in the future
+  remove(path);
+
+  if (access(path, F_OK) != 0) {
+        if ((pop = pmemobj_create(path, POBJ_LAYOUT_NAME(ht),
+            HT_POOL_SIZE, S_IWUSR | S_IRUSR)) == NULL) {
+            printf("failed to create pool1 wiht name %s\n", path);
+            return NULL;
+        }
+  } else {
+      if ((pop = pmemobj_open(path, POBJ_LAYOUT_NAME(ht))) == NULL) {
+          printf("failed to open pool with name %s\n", path);
+          return NULL;
+      }
+  }
+
+  TOID(ht_intset_t) root = POBJ_ROOT(pop, ht_intset_t);
 
   size_t bs = (maxhtlength + 1) * sizeof(linkedlist_t);
   bs += CACHE_LINE_SIZE - (bs & CACHE_LINE_SIZE);
-  if ((set->buckets = (linkedlist_t*)malloc(bs)) == NULL)
-    {
-      perror("malloc");
-      exit(1);
-    }  
 
-  for (i = 0; i < maxhtlength; i++) 
-    {
-      bucket_set_init(&set->buckets[i], epoch);
+  TX_BEGIN(pop) {
+    TX_ADD(root);
+    D_RW(root)->hash = maxhtlength - 1;
+    D_RW(root)->buckets = *D_RW(TX_ALLOC(plinkedlist_t, bs));
+
+  } TX_ONCOMMIT {
+    int i;
+    for (i = 0; i < maxhtlength; i++) {
+      bucket_set_init(&D_RW(root)->buckets[i], epoch);
     }
-  return set;
+    return D_RW(root);
+
+  } TX_ONABORT {
+    return NULL;
+
+  } TX_END
 }

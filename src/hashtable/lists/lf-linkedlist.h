@@ -28,6 +28,7 @@ typedef struct node_t {
 
 
 typedef volatile node_t* linkedlist_t;
+typedef linkedlist_t* plinkedlist_t;
 
 svalue_t linkedlist_find(linkedlist_t * ll, skey_t key, EpochThread epoch, linkcache_t* buffer);
 int linkedlist_insert(linkedlist_t * ll, skey_t key, svalue_t value, EpochThread epoch, linkcache_t* buffer);

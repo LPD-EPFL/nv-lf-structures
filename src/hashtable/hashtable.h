@@ -22,6 +22,7 @@
  */
 
 #include "./lists/lf-linkedlist.h"
+#include <libpmemobj.h>
 
 #define DEFAULT_MOVE                    0
 #define DEFAULT_SNAPSHOT                0
@@ -31,6 +32,8 @@
 #define DEFAULT_EFFECTIVE               1
 
 #define MAXHTLENGTH                     65536
+
+#define HT_POOL_SIZE    (1024 * 1024 * 1024)
 
 /* Hashtable length (# of buckets) */
 extern unsigned int maxhtlength;
@@ -53,3 +56,8 @@ void ht_delete(ht_intset_t *set);
 int ht_size(ht_intset_t *set);
 int floor_log_2(unsigned int n);
 ht_intset_t *ht_new(EpochThread epoch);
+
+POBJ_LAYOUT_BEGIN(ht);
+POBJ_LAYOUT_ROOT(ht, ht_intset_t);
+POBJ_LAYOUT_TOID(ht, plinkedlist_t);
+POBJ_LAYOUT_END(ht);
