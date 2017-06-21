@@ -59,5 +59,5 @@ ht_intset_t *ht_new(EpochThread epoch);
 
 POBJ_LAYOUT_BEGIN(ht);
 POBJ_LAYOUT_ROOT(ht, ht_intset_t);
-POBJ_LAYOUT_TOID(ht, plinkedlist_t);
+POBJ_LAYOUT_TOID(ht, linkedlist_t);
 POBJ_LAYOUT_END(ht);

@@ -127,17 +127,20 @@ ht_new(EpochThread epoch)
   size_t bs = (maxhtlength + 1) * sizeof(linkedlist_t);
   bs += CACHE_LINE_SIZE - (bs & CACHE_LINE_SIZE);
 
+  ht_intset_t* set = NULL;
+
   TX_BEGIN(pop) {
     TX_ADD(root);
-    D_RW(root)->hash = maxhtlength - 1;
-    D_RW(root)->buckets = *D_RW(TX_ALLOC(plinkedlist_t, bs));
+    set = D_RW(root);
+    set->hash = maxhtlength - 1;
+    set->buckets = D_RW(TX_ALLOC(linkedlist_t, bs));
 
   } TX_ONCOMMIT {
     int i;
     for (i = 0; i < maxhtlength; i++) {
-      bucket_set_init(&D_RW(root)->buckets[i], epoch);
+      bucket_set_init(&set->buckets[i], epoch);
     }
-    return D_RW(root);
+    return set;
 
   } TX_ONABORT {
     return NULL;
