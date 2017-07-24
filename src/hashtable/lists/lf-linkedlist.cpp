@@ -4,27 +4,27 @@ const int linkedlist_node_size = sizeof(node_t);
 
 //#define DO_DEBUG 1
 
-void finalize_node(void * node, void * context, void* tls) {
-	EpochFreeNode(node);
-}
+// void finalize_node(void * node, void * context, void* tls) {
+// 	EpochFreeNode(node);
+// }
 
-static inline UINT_PTR unmarked_ptr(UINT_PTR p) {
-	return(p & ~(UINT_PTR)0x01);
-}
+// static inline UINT_PTR unmarked_ptr(UINT_PTR p) {
+// 	return(p & ~(UINT_PTR)0x01);
+// }
 
-#define UNMARKED_PTR(p) (node_t*)unmarked_ptr((UINT_PTR) p)
+// #define UNMARKED_PTR(p) (node_t*)unmarked_ptr((UINT_PTR) p)
 
-static inline UINT_PTR marked_ptr(UINT_PTR p) {
-	return (p | (UINT_PTR)0x01);
-}
+// static inline UINT_PTR marked_ptr(UINT_PTR p) {
+// 	return (p | (UINT_PTR)0x01);
+// }
 
-#define MARKED_PTR(p) (node_t*)marked_ptr((UINT_PTR) p)
+// #define MARKED_PTR(p) (node_t*)marked_ptr((UINT_PTR) p)
 
-static inline int ptr_is_marked(UINT_PTR p) {
-	return (int)(p & (UINT_PTR)0x01);
-}
+// static inline int ptr_is_marked(UINT_PTR p) {
+// 	return (int)(p & (UINT_PTR)0x01);
+// }
 
-#define PTR_IS_MARKED(p) ptr_is_marked((UINT_PTR) p)
+// #define PTR_IS_MARKED(p) ptr_is_marked((UINT_PTR) p)
 
 linkedlist_t* new_linkedlist(EpochThread epoch) {
 	//TODO: in persistent memory, this might have to be done differently;
