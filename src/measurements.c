@@ -29,6 +29,10 @@
 #include "measurements.h"
 #include "latency.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 __thread ticks getticks_correction = 0;
 ticks getticks_correction_calc() 
 {
@@ -233,4 +237,8 @@ ecdf_destroy(ecdf_t* e)
   free(e);
 }
 
+#endif
+
+#ifdef  __cplusplus
+}
 #endif

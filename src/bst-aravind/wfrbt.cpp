@@ -31,7 +31,6 @@ Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees
 #include <signal.h>
 #include <sys/time.h>
 
-#include <link-cache.h>
 #include "wfrbt.h"
 #include "operations.h" 
 

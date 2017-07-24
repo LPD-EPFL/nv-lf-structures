@@ -28,8 +28,6 @@ endif
 endif
 endif
 
-CFLAGS += -I/home/zablotch/local/include/ -I/home/zablotch/local/include/atomic_ops -I/home/zablotch/local/include/atomic_ops/sysdeps
-
 measurements.o:
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/measurements.o $(PROF)/measurements.c
 
