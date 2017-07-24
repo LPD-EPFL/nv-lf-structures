@@ -488,17 +488,15 @@ bool delete_node(thread_data_t * data, long key){
     }
 }
 
-int is_reachable(node_t* root, void* address) {
+int is_reachable(thread_data_t * data, void* address) {
 
-    if (root == NULL) { 
-        return 0 ;
-    }
-
-    if ((void*) root == address ) {
+    long key = ((node_t*) address)->key;
+    if (search(data, key)) {
         return 1;
+    } else {
+        return 0;
     }
 
-    return (is_reachable((node_t *)get_addr_for_reading(root->child.AO_val1), address) || is_reachable((node_t *)get_addr_for_reading(root->child.AO_val2), address));
 }
 
 void recover(thread_data_t * data, active_page_table_t** page_buffers, int num_page_buffers) {
@@ -526,7 +524,7 @@ void recover(thread_data_t * data, active_page_table_t** page_buffers, int num_p
                     for (k = 0; k < nodes_per_page; k++) {
                         void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
                         if (!NodeMemoryIsFree(node_address)) {
-                            if (!is_reachable(data->rootOfTree, node_address)) {
+                            if (!is_reachable(data, node_address)) {
 
                                 MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
           
