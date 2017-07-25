@@ -287,87 +287,87 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 }
 
 
-int is_reachable(linkedlist_t* ll, void* address) {
-	volatile node_t* node = UNMARKED_PTR((*ll)->next);
-	while (node->next != NULL) {
-		if ((void*)node == address) {
-			return 1;
-		}
-		node = UNMARKED_PTR(node->next);
-	}
-	return 0;
-}
+// int is_reachable(linkedlist_t* ll, void* address) {
+// 	volatile node_t* node = UNMARKED_PTR((*ll)->next);
+// 	while (node->next != NULL) {
+// 		if ((void*)node == address) {
+// 			return 1;
+// 		}
+// 		node = UNMARKED_PTR(node->next);
+// 	}
+// 	return 0;
+// }
 
 
-void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_buffers, int num_page_buffers) {
+// void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_buffers, int num_page_buffers) {
 
-	node_t ** unlinking_address = (node_t**)EpochCacheAlignedAlloc(sizeof(node_t*));
+// 	node_t ** unlinking_address = (node_t**)EpochCacheAlignedAlloc(sizeof(node_t*));
 
-	volatile node_t* prev = UNMARKED_PTR((*ll));
-	volatile node_t* node = UNMARKED_PTR((*ll)->next);
-	volatile node_t* next;
-	int i;
+// 	volatile node_t* prev = UNMARKED_PTR((*ll));
+// 	volatile node_t* node = UNMARKED_PTR((*ll)->next);
+// 	volatile node_t* next;
+// 	int i;
 
-	//remove the marked nodes
-	while (node->next != NULL) {
+// 	//remove the marked nodes
+// 	while (node->next != NULL) {
 
-		next = UNMARKED_PTR(node->next);
+// 		next = UNMARKED_PTR(node->next);
 
-		if (PTR_IS_MARKED(node->next)) {
-			*unlinking_address = (node_t*)node;
-			write_data_wait(unlinking_address, 1);
-			prev->next = next;
-			write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);	
-			if (!NodeMemoryIsFree((void*)node)) {
-				finalize_node((void*)node, NULL, NULL);
-			}
-			node = prev->next;
-		}
-		else {
-			prev = node;
-			node = next;
-		}
-	}
-	wait_writes();
-	EpochCacheAlignedFree(unlinking_address);
+// 		if (PTR_IS_MARKED(node->next)) {
+// 			*unlinking_address = (node_t*)node;
+// 			write_data_wait(unlinking_address, 1);
+// 			prev->next = next;
+// 			write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);	
+// 			if (!NodeMemoryIsFree((void*)node)) {
+// 				finalize_node((void*)node, NULL, NULL);
+// 			}
+// 			node = prev->next;
+// 		}
+// 		else {
+// 			prev = node;
+// 			node = next;
+// 		}
+// 	}
+// 	wait_writes();
+// 	EpochCacheAlignedFree(unlinking_address);
 
-	// now go over all the pages in the page buffers and check which of the nodes there are reachable;
+// 	// now go over all the pages in the page buffers and check which of the nodes there are reachable;
 
-	size_t j;
-	size_t k;
-	size_t page_size;
-	size_t nodes_per_page;
+// 	size_t j;
+// 	size_t k;
+// 	size_t page_size;
+// 	size_t nodes_per_page;
 
-	page_descriptor_t* crt;
-    size_t num_pages;
+// 	page_descriptor_t* crt;
+//     size_t num_pages;
 
-	for (i = 0; i < num_page_buffers; i++) {
-		page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
-        num_pages = page_buffers[i]->last_in_use;
-        crt = page_buffers[i]->pages;
-        for (j = 0; j < num_pages; j++) {
-				if (crt[j].page != NULL) {
-					void * crt_address = crt[j].page;
-					nodes_per_page = page_size / sizeof(node_t);
-					for (k = 0; k < nodes_per_page; k++) {
-						void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
-						if (!NodeMemoryIsFree(node_address)) {
-							if (!is_reachable(ll, node_address)) {
-				//				if (NodeMemoryIsFree(node_address)) {
-									//this should never happen in this structure - since we remove marked nodes
-				//					fprintf(stderr, "error: reachable node whose memory was free\n");
-									//MarkNodeMemoryAsAllocated(node_address); //if a node is reachable but its memory is marked as free, need to mark that memory as allocated
-				//				}
-			//				}
-				//			else {
-				//				if (!NodeMemoryIsFree(node_address)) {
-									MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
-				//				}
-							}
-						}
-					}
-				}
-			}
-		destroy_active_page_table(page_buffers[i]);
-	}
-}
+// 	for (i = 0; i < num_page_buffers; i++) {
+// 		page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
+//         num_pages = page_buffers[i]->last_in_use;
+//         crt = page_buffers[i]->pages;
+//         for (j = 0; j < num_pages; j++) {
+// 				if (crt[j].page != NULL) {
+// 					void * crt_address = crt[j].page;
+// 					nodes_per_page = page_size / sizeof(node_t);
+// 					for (k = 0; k < nodes_per_page; k++) {
+// 						void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
+// 						if (!NodeMemoryIsFree(node_address)) {
+// 							if (!is_reachable(ll, node_address)) {
+// 				//				if (NodeMemoryIsFree(node_address)) {
+// 									//this should never happen in this structure - since we remove marked nodes
+// 				//					fprintf(stderr, "error: reachable node whose memory was free\n");
+// 									//MarkNodeMemoryAsAllocated(node_address); //if a node is reachable but its memory is marked as free, need to mark that memory as allocated
+// 				//				}
+// 			//				}
+// 				//			else {
+// 				//				if (!NodeMemoryIsFree(node_address)) {
+// 									MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
+// 				//				}
+// 							}
+// 						}
+// 					}
+// 				}
+// 			}
+// 		destroy_active_page_table(page_buffers[i]);
+// 	}
+// }

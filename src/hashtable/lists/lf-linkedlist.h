@@ -63,8 +63,8 @@ void delete_linkedlist(linkedlist_t * ll);
 volatile node_t* new_node(skey_t key, svalue_t value, EpochThread epoch);
 volatile node_t* new_node_and_set_next(skey_t key, svalue_t value, volatile node_t* next, EpochThread epoch);
 
-int is_reachable(linkedlist_t* ll, void* address);
-void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_buffers, int num_page_buffers);
+// int is_reachable(linkedlist_t* ll, void* address);
+// void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_buffers, int num_page_buffers);
 
 int linkedlist_size(linkedlist_t* ll);
 

@@ -66,7 +66,7 @@ int is_reachable(ht_intset_t* ht, void* address) {
 }
 
 
-void recover(ht_intset_t* ht, linkcache_t* buffer, active_page_table_t** page_buffers, int num_page_buffers) {
+void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_buffers) {
         // now go over all the pages in the page buffers and check which of the nodes there are reachable;
 
     // first, remove the marked nodes of each linked list
@@ -105,8 +105,8 @@ void recover(ht_intset_t* ht, linkcache_t* buffer, active_page_table_t** page_bu
             }
         }
         wait_writes();
-        EpochCacheAlignedFree(unlinking_address);
     }
+    EpochCacheAlignedFree(unlinking_address);
 
 
     size_t k;
