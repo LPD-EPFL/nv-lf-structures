@@ -358,6 +358,6 @@ void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_b
 					}
 				}
 			}
-		destroy_active_page_table(page_buffers[i]);
+		//destroy_active_page_table(page_buffers[i]);
 	}
 }

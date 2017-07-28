@@ -23,6 +23,7 @@
 
 #include "./lists/lf-linkedlist.h"
 #include <libpmemobj.h>
+#include <pwd.h>
 
 #define DEFAULT_MOVE                    0
 #define DEFAULT_SNAPSHOT                0

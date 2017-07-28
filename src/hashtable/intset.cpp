@@ -70,7 +70,7 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
         // now go over all the pages in the page buffers and check which of the nodes there are reachable;
 
     // first, remove the marked nodes of each linked list
-    node_t ** unlinking_address = (node_t**)EpochCacheAlignedAlloc(sizeof(node_t*));
+    //node_t ** unlinking_address = (node_t**)EpochCacheAlignedAlloc(sizeof(node_t*));
     linkedlist_t* ll;
     volatile node_t* prev; 
     volatile node_t* node; 
@@ -78,35 +78,35 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
     int i;
     size_t j;
 
-    for (j = 0; j < maxhtlength; j++) {
-        ll = &ht->buckets[j];
+    //for (j = 0; j < maxhtlength; j++) {
+        //ll = &ht->buckets[j];
 
-        prev = UNMARKED_PTR((*ll));
-        node = UNMARKED_PTR((*ll)->next);
+        //prev = UNMARKED_PTR((*ll));
+        //node = UNMARKED_PTR((*ll)->next);
 
-        //remove the marked nodes
-        while (node->next != NULL) {
+        ////remove the marked nodes
+        //while (node->next != NULL) {
 
-            next = UNMARKED_PTR(node->next);
+            //next = UNMARKED_PTR(node->next);
 
-            if (PTR_IS_MARKED(node->next)) {
-                *unlinking_address = (node_t*)node;
-                write_data_wait(unlinking_address, 1);
-                prev->next = next;
-                write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);  
-                if (!NodeMemoryIsFree((void*)node)) {
-                    finalize_node((void*)node, NULL, NULL);
-                }
-                node = prev->next;
-            }
-            else {
-                prev = node;
-                node = next;
-            }
-        }
-        wait_writes();
-    }
-    EpochCacheAlignedFree(unlinking_address);
+            //if (PTR_IS_MARKED(node->next)) {
+                //*unlinking_address = (node_t*)node;
+                //write_data_wait(unlinking_address, 1);
+                //prev->next = next;
+                //write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);  
+                //if (!NodeMemoryIsFree((void*)node)) {
+                    //finalize_node((void*)node, NULL, NULL);
+                //}
+                //node = prev->next;
+            //}
+            //else {
+                //prev = node;
+                //node = next;
+            //}
+        //}
+        //wait_writes();
+    //}
+    //EpochCacheAlignedFree(unlinking_address);
 
 
     size_t k;
@@ -116,7 +116,10 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
     page_descriptor_t* crt;
     size_t num_pages;
 
+    //fprintf(stderr, "recovery going over pages\n");
+
     for (i = 0; i < num_page_buffers; i++) {
+        //fprintf(stderr, "going over page table %d\n",i);
         page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
         num_pages = page_buffers[i]->last_in_use;
         crt = page_buffers[i]->pages;
@@ -136,6 +139,7 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
                 }
             }
         }
-        destroy_active_page_table(page_buffers[i]);
+        //fprintf(stderr, "destroying page table %d\n",i);
+        //destroy_active_page_table(page_buffers[i]);
         }
 }

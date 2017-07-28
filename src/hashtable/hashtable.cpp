@@ -103,7 +103,9 @@ ht_new(EpochThread epoch)
   PMEMobjpool *pop = NULL;
 
   char path[32];  
-  sprintf(path, "/tmp/ht_pool"); 
+  char *uname = cuserid(NULL);
+
+  sprintf(path, "/tmp/ht_pool_%s",uname); 
 
   //remove file if it exists
   //TODO might want to remove this instruction in the future

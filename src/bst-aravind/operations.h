@@ -533,7 +533,7 @@ void recover(thread_data_t * data, active_page_table_t** page_buffers, int num_p
                     }
                 }
             }
-        destroy_active_page_table(page_buffers[i]);
+        //destroy_active_page_table(page_buffers[i]);
     }
 }
 

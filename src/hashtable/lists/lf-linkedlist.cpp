@@ -42,11 +42,14 @@ linkedlist_t* new_linkedlist(EpochThread epoch) {
 void
 bucket_set_init(linkedlist_t* set, EpochThread epoch)
 {
-
+	EpochStart(epoch);
 	volatile node_t* max = new_node_and_set_next(MAX_KEY, 0, NULL, epoch);
+	write_data_wait((void*)max, CACHE_LINES_PER_NV_NODE);
 	volatile node_t* min = new_node_and_set_next(MIN_KEY, 0, max, epoch);
+	write_data_wait((void*)min, CACHE_LINES_PER_NV_NODE);
 	(*set) = min;
-
+	write_data_wait((void*)set, 1);
+    EpochEnd(epoch);
 }
 
 void delete_linkedlist(linkedlist_t* ll) {
