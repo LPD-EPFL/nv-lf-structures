@@ -509,12 +509,12 @@ main(int argc, char **argv)
 //#endif
     volatile ticks corr = getticks_correction_calc();
 	ticks startCycles = getticks();
-	DS_RECOVER(set, page_buffers, num_threads);
+	DS_RECOVER(set, page_tables, num_threads);
 	ticks endCycles = getticks();
 
 	recovery_cycles = endCycles - startCycles + corr;
 	free(page_tables);
-	page_buffer_t* pb = create_page_buffer();
+	active_page_table_t* pb = create_active_page_table(num_threads);
 
 	SetOpaquePageBuffer(epoch, pb);
 #else

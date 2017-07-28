@@ -289,7 +289,7 @@ int is_reachable(linkedlist_t* ll, void* address) {
 }
 
 
-void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_buffers, int num_page_buffers) {
+void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_buffers) {
 
 	node_t ** unlinking_address = (node_t**)EpochCacheAlignedAlloc(sizeof(node_t*));
 
@@ -299,27 +299,27 @@ void recover(linkedlist_t* ll, linkcache_t* buffer, active_page_table_t** page_b
 	int i;
 
 	//remove the marked nodes
-	while (node->next != NULL) {
+	//while (node->next != NULL) {
 
-		next = UNMARKED_PTR(node->next);
+		//next = UNMARKED_PTR(node->next);
 
-		if (PTR_IS_MARKED(node->next)) {
-			*unlinking_address = (node_t*)node;
-			write_data_wait(unlinking_address, 1);
-			prev->next = next;
-			write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);	
-			if (!NodeMemoryIsFree((void*)node)) {
-				finalize_node((void*)node, NULL, NULL);
-			}
-			node = prev->next;
-		}
-		else {
-			prev = node;
-			node = next;
-		}
-	}
-	wait_writes();
-	EpochCacheAlignedFree(unlinking_address);
+		//if (PTR_IS_MARKED(node->next)) {
+			//*unlinking_address = (node_t*)node;
+			//write_data_wait(unlinking_address, 1);
+			//prev->next = next;
+			//write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);	
+			//if (!NodeMemoryIsFree((void*)node)) {
+				//finalize_node((void*)node, NULL, NULL);
+			//}
+			//node = prev->next;
+		//}
+		//else {
+			//prev = node;
+			//node = next;
+		//}
+	//}
+	//wait_writes();
+	//EpochCacheAlignedFree(unlinking_address);
 
 	// now go over all the pages in the page buffers and check which of the nodes there are reachable;
 
