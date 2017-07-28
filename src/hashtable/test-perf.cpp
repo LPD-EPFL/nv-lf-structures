@@ -225,6 +225,7 @@ test(void* thread)
 #endif
 
   SSPFDTERM();
+  FlushThread();
   THREAD_END();
   pthread_exit(NULL);
 }
@@ -506,6 +507,7 @@ main(int argc, char **argv)
     ticks recovery_cycles = 0;
 
 #ifdef ESTIMATE_RECOVERY
+  FlushThread();
 	active_page_table_t** page_tables = (active_page_table_t**)malloc(sizeof(active_page_table_t*) * (num_threads));
 	for (ULONG i = 0; i < num_threads; i++) {
 		page_tables[i] = tds[i].page_table;
