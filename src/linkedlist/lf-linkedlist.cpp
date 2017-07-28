@@ -40,7 +40,8 @@ linkedlist_t* new_linkedlist(EpochThread epoch) {
 }
 
 void delete_linkedlist(linkedlist_t* ll) {
-	finalize_node((void*)(*ll)->next, NULL, NULL);
+	 //node_t* nnext = UNMARKED_PTR((*ll)->next);
+	//finalize_node((void*)nnext, NULL, NULL);
 	finalize_node((void*)(*ll), NULL, NULL);
 	free(ll);
 }
@@ -279,6 +280,7 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 
 int is_reachable(linkedlist_t* ll, void* address) {
 	volatile node_t* node = UNMARKED_PTR((*ll)->next);
+    if ((void*) node == address) return 1;
 	while (node->next != NULL) {
 		if ((void*)node == address) {
 			return 1;
@@ -332,6 +334,7 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
     size_t num_pages;
 
 	for (i = 0; i < num_page_buffers; i++) {
+        //fprintf(stderr, "apt %d\n", i);
 		page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
         num_pages = page_buffers[i]->last_in_use;
         crt = page_buffers[i]->pages;
@@ -340,9 +343,13 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
 					void * crt_address = crt[j].page;
 					nodes_per_page = page_size / sizeof(node_t);
 					for (k = 0; k < nodes_per_page; k++) {
-						void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
+						//void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
+                        void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
 						if (!NodeMemoryIsFree(node_address)) {
+                            //assert(((uintptr_t)node_address % 64) == 0);
+                            //if(node_address == (void*)node) fprintf(stderr, "next1\n");
 							if (!is_reachable(ll, node_address)) {
+                            //if(node_address == (void*)node) fprintf(stderr, "next2\n");
 				//				if (NodeMemoryIsFree(node_address)) {
 									//this should never happen in this structure - since we remove marked nodes
 				//					fprintf(stderr, "error: reachable node whose memory was free\n");
@@ -359,5 +366,7 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
 				}
 			}
 		//destroy_active_page_table(page_buffers[i]);
+        //fprintf(stderr, "apt %d done\n",i);
 	}
+    //fprintf(stderr, "done\n");
 }

@@ -219,6 +219,7 @@ test(void* thread)
 #ifndef ESTIMATE_RECOVERY
   EpochThreadShutdown(epoch);
 #endif
+    FlushThread();
 
   SSPFDTERM();
   THREAD_END();
@@ -421,6 +422,9 @@ main(int argc, char **argv)
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     
   thread_data_t* tds = (thread_data_t*) malloc(num_threads * sizeof(thread_data_t));
+#ifdef ESTIMATE_RECOVERY
+	active_page_table_t** page_tables = (active_page_table_t**)malloc(sizeof(active_page_table_t*) * (num_threads));
+#endif
 
   size_t t;
   for(t = 0; t < num_threads; t++)
@@ -494,7 +498,8 @@ main(int argc, char **argv)
     ticks recovery_cycles = 0;
 
 #ifdef ESTIMATE_RECOVERY
-	active_page_table_t** page_tables = (active_page_table_t**)malloc(sizeof(active_page_table_t*) * (num_threads));
+    FlushThread();
+  nanosleep(&timeout, NULL);
 	for (ULONG i = 0; i < num_threads; i++) {
 		page_tables[i] = tds[i].page_table;
 		fprintf(stderr, "page table %d has %u pages\n", i, page_tables[i]->current_size);
@@ -513,6 +518,14 @@ main(int argc, char **argv)
 	ticks endCycles = getticks();
 
 	recovery_cycles = endCycles - startCycles + corr;
+
+    
+	for (ULONG i = 0; i < num_threads; i++) {
+         //fprintf(stderr, "destroying %d\n",i);
+        //destroy_active_page_table(page_tables[i]);
+	}
+
+    MEM_BARRIER;
 	free(page_tables);
 	active_page_table_t* pb = create_active_page_table(num_threads);
 
@@ -520,6 +533,8 @@ main(int argc, char **argv)
 #else
   EpochThreadShutdown(epoch);
 #endif
+
+  nanosleep(&timeout, NULL);
 
 #if defined(COMPUTE_LATENCY)
   printf("#thread srch_suc srch_fal insr_suc insr_fal remv_suc remv_fal   ## latency (in cycles) \n"); fflush(stdout);
@@ -567,7 +582,7 @@ main(int argc, char **argv)
 
     DS_DELETE(set);
 #ifdef ESTIMATE_RECOVERY
-	destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
+    destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
 #endif
 
   cache_destroy(lc);
