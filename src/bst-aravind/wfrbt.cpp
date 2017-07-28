@@ -390,7 +390,7 @@ restart:
 #ifndef ESTIMATE_RECOVERY
   EpochThreadShutdown(d->epoch);
 #endif
-
+  FlushThread();
   return NULL;
 }
 
@@ -811,6 +811,8 @@ node_t * newRT = new node_t;
   ticks recovery_cycles = 0;
 
 #ifdef ESTIMATE_RECOVERY
+
+  FlushThread();
   active_page_table_t** page_tables = (active_page_table_t**)malloc(sizeof(active_page_table_t*) * (nb_threads));
   for (ULONG i = 0; i < nb_threads; i++) {
     page_tables[i] = data[i].page_table;
