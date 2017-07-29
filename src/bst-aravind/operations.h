@@ -13,6 +13,19 @@ void finalize_node(void * node, void * context, void* tls) {
   EpochFreeNode(node);
 }
 
+
+inline int link_and_persist_ao(volatile AO_t* target, AO_t oldvalue, AO_t value) {
+	//return CAS_PTR(target,oldvalue, value);
+    int result = atomic_cas_full(target, oldvalue, value);
+	//if cas successful, we updated the link, but it still needs flushing
+	if (!result) {
+		return 0; //nothing gets fluhed
+	}
+	write_data_wait((PVOID*)target, 1);
+	UNUSED int dummy = atomic_cas_full(target, mark_ptr_cache((UINT_PTR)value),value);
+	return result;
+}
+
 seekRecord_t * insseek(thread_data_t * data, uint64_t key, int op){
     
     node_t * gpar = NULL; // last node (ancestor of parent on access path) whose child pointer field is unmarked
@@ -309,11 +322,19 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
         EpochDeclareUnlinkNode(data->epoch, (void*)R->lumC, sizeof(node_t));
         if(R->isLeftUM){
              // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+#ifdef BUFFERING_ON
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val1, (VPVOID)R->lumC, (VPVOID)newWord);
+#else
+             result = link_and_persist_ao(&R->lum->child.AO_val1, R->lumC, (volatile AO_t) newWord);
+#endif
         }
         else{
              // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+#ifdef BUFFERING_ON
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
+#else
+             result = link_and_persist_ao(&R->lum->child.AO_val2, R->lumC, (volatile AO_t) newWord);
+#endif
         }
         return result; 
         
@@ -335,11 +356,19 @@ int help_conflicting_operation (thread_data_t * data, seekRecord_t * R){
         EpochDeclareUnlinkNode(data->epoch, (void*)R->lumC, sizeof(node_t));
         if(R->isLeftUM){
              // result = atomic_cas_full(&R->lum->child.AO_val1, R->lumC, newWord);
+#ifdef BUFFERING_ON
              result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val1, (VPVOID)R->lumC, (VPVOID)newWord);
+#else
+             result = link_and_persist_ao(&R->lum->child.AO_val1, R->lumC, (volatile AO_t) newWord);
+#endif
         }
         else{
             // result = atomic_cas_full(&R->lum->child.AO_val2, R->lumC, newWord);
+#ifdef BUFFERING_ON
             result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->lum->child.AO_val2, (VPVOID)R->lumC, (VPVOID)newWord);
+#else
+            result = link_and_persist_ao(&R->lum->child.AO_val2, R->lumC, (volatile AO_t) newWord);
+#endif
         }
         
     return result; 
@@ -363,12 +392,20 @@ int inject(thread_data_t * data, seekRecord_t * R, int op){
         
         if(R->isLeftL){
             // result = atomic_cas_full(&R->parent->child.AO_val1, R->pL, newWord);
+#ifdef BUFFERING_ON
             result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->parent->child.AO_val1, (VPVOID)R->pL, (VPVOID)newWord);
-            
+#else
+            result = link_and_persist_ao(&R->parent->child.AO_val1, (volatile AO_t) R->pL, (volatile AO_t) newWord);
+#endif
+
         }
         else{
             // result = atomic_cas_full(&R->parent->child.AO_val2, R->pL, newWord);
+#ifdef BUFFERING_ON
             result = cache_try_link_and_add(data->buffer, R->leafKey, (VPVOID*)&R->parent->child.AO_val2, (VPVOID)R->pL, (VPVOID)newWord);
+#else
+            result = link_and_persist_ao(&R->parent->child.AO_val2, R->pL, (volatile AO_t) newWord);
+#endif
         }
         
         return result;
