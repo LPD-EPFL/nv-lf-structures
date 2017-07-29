@@ -27,6 +27,10 @@
 #define MARK_BIT 1
 #define FLAG_BIT 0
 
+#define NODE_PADDING 1
+
+#define CACHE_LINES_PER_NV_NODE 1
+
 
 enum{INS,DEL};
 enum {UNMARK,MARK};
@@ -35,16 +39,23 @@ enum {UNFLAG,FLAG};
 typedef uintptr_t Word;
 
 typedef struct node{
-    int key;
     AO_double_t volatile child;
+    uint64_t key;
     #ifdef UPDATE_VAL
-        long value;
+        uint64_t value;
+        #ifdef NODE_PADDING
+            BYTE padding[CACHE_LINE_SIZE - sizeof(uint64_t) - sizeof(AO_double_t) - sizeof(uint64_t)];
+        #endif
+    #else
+        #ifdef NODE_PADDING
+            BYTE padding[CACHE_LINE_SIZE - sizeof(uint64_t) - sizeof(AO_double_t)];
+        #endif
     #endif
 } node_t;
 
 typedef struct seekRecord{
   // SeekRecord structure
-  long leafKey;
+  uint64_t leafKey;
   node_t * parent;
   AO_t pL;
   bool isLeftL; // is L the left child of P?
@@ -101,9 +112,9 @@ typedef struct thread_data {
 
 
 // Forward declaration of window transactions
-int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, long key);
+int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, uint64_t key);
 
-int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, long newKey);
+int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, uint64_t newKey);
 
 
 /* ################################################################### *

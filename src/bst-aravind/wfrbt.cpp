@@ -79,8 +79,8 @@ long leafNodes = 0;
  * Correctness Checking
  * ################################################################### */
  
-long in_order_visit(node_t * rootNode){
-    long key = rootNode->key;
+uint64_t in_order_visit(node_t * rootNode){
+    uint64_t key = rootNode->key;
     
     if((node_t *)get_addr_for_reading(rootNode->child.AO_val1) == NULL){
         leafNodes++;
@@ -91,7 +91,7 @@ long in_order_visit(node_t * rootNode){
     node_t * rChild = (node_t *)get_addr_for_reading(rootNode->child.AO_val2);
     
     if((lChild) != NULL){
-        long lKey = in_order_visit(lChild);
+        uint64_t lKey = in_order_visit(lChild);
         if(lKey >= key){
             std::cout << "Lkey is larger!!__" << lKey << "__ " << key << std::endl;
             std::cout << "Sanity Check Failed!!" << std::endl;
@@ -99,7 +99,7 @@ long in_order_visit(node_t * rootNode){
     }
     
     if((rChild) != NULL){
-        long rKey = in_order_visit(rChild);
+        uint64_t rKey = in_order_visit(rChild);
         if(rKey < key){
             std::cout << "Rkey is smaller!!__" << rKey << "__ " << key <<  std::endl;
             std::cout << "Sanity Check Failed!!" << std::endl;
@@ -112,7 +112,7 @@ long in_order_visit(node_t * rootNode){
 
 
 /*************************************************************************************************/
-int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, long newKey){
+int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, uint64_t newKey){
   
   node_t *newInt ;
   node_t *newLeaf;
@@ -141,7 +141,7 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
   _mm_sfence();
     
   node_t * existLeaf = (node_t *)get_addr_for_reading(R->pL);
-  long existKey = R->leafKey;
+  uint64_t existKey = R->leafKey;
 
         
   if(newKey < existKey){
@@ -188,7 +188,7 @@ int perform_one_insert_window_operation(thread_data_t* data, seekRecord_t * R, l
 
 /*************************************************************************************************/
 
-int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, long key){
+int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, uint64_t key){
   
   AO_t pS;
     
@@ -724,7 +724,7 @@ node_t * newRT = new node_t;
   
   // CONSISTENCY CHECK
   leafNodes = 0;    
-  long rootkey =  in_order_visit((newRT));
+  uint64_t rootkey =  in_order_visit((newRT));
   unsigned long tot_inserts = 0;
   unsigned long tot_deletes = 0;
   unsigned long tot_ops = 0;

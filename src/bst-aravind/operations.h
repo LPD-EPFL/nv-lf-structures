@@ -13,7 +13,7 @@ void finalize_node(void * node, void * context, void* tls) {
   EpochFreeNode(node);
 }
 
-seekRecord_t * insseek(thread_data_t * data, long key, int op){
+seekRecord_t * insseek(thread_data_t * data, uint64_t key, int op){
     
     node_t * gpar = NULL; // last node (ancestor of parent on access path) whose child pointer field is unmarked
     node_t * par = data->rootOfTree;
@@ -95,7 +95,7 @@ seekRecord_t * insseek(thread_data_t * data, long key, int op){
 }
 
 
-seekRecord_t * delseek(thread_data_t * data, long key, int op){
+seekRecord_t * delseek(thread_data_t * data, uint64_t key, int op){
     node_t * gpar = NULL; // last node (ancestor of parent on access path) whose child pointer field is unmarked
     node_t * par = data->rootOfTree;
     node_t * leaf;
@@ -178,7 +178,7 @@ seekRecord_t * delseek(thread_data_t * data, long key, int op){
 }
 
 
-seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr){
+seekRecord_t * secondary_seek(thread_data_t * data, uint64_t key, seekRecord_t * sr){
     
     node_t * flaggedLeaf = (node_t *)get_addr_for_reading(sr->pL);
     node_t * gpar = NULL; // last node (ancestor of parent on access path) whose child pointer field is unmarked
@@ -256,10 +256,10 @@ seekRecord_t * secondary_seek(thread_data_t * data, long key, seekRecord_t * sr)
   return R;
 }
 
-bool search(thread_data_t * data, long key){
+bool search(thread_data_t * data, uint64_t key){
     EpochStart(data->epoch);
     node_t * cur = (node_t *)get_addr_for_reading(data->rootOfTree->child.AO_val1);
-    long lastKey;    
+    uint64_t lastKey;    
     while(cur != NULL){
       lastKey = cur->key;
         cur = (key < lastKey? (node_t *)get_addr_for_reading(cur->child.AO_val1): (node_t *)get_addr_for_reading(cur->child.AO_val2));
@@ -374,7 +374,7 @@ int inject(thread_data_t * data, seekRecord_t * R, int op){
         return result;
 }
 
-bool insert(thread_data_t * data, long key){
+bool insert(thread_data_t * data, uint64_t key){
 
 	  
 	int injectResult;
@@ -416,7 +416,7 @@ bool insert(thread_data_t * data, long key){
     // execute insert window operation.    
 } 
 
-bool delete_node(thread_data_t * data, long key){
+bool delete_node(thread_data_t * data, uint64_t key){
     EpochStart(data->epoch);
     int injectResult;
     
@@ -490,7 +490,7 @@ bool delete_node(thread_data_t * data, long key){
 
 int is_reachable(thread_data_t * data, void* address) {
 
-    long key = ((node_t*) address)->key;
+    uint64_t key = ((node_t*) address)->key;
     if (search(data, key)) {
         return 1;
     } else {
