@@ -7,7 +7,7 @@ static inline UINT_PTR unmarked_ptr(UINT_PTR p) {
 #define UNMARKED_PTR(p) (node_t*)unmarked_ptr((UINT_PTR) p)
 
 static inline UINT_PTR unmarked_ptr_all(UINT_PTR p) {
-	return(p & ~(UINT_PTR)0x03);
+	return(p & ~(UINT_PTR)0x07);
 }
 
 #define UNMARKED_PTR_ALL(p) (node_t*)unmarked_ptr_all((UINT_PTR) p)
@@ -40,7 +40,7 @@ int get_random_level() {
 }
 
 void sl_finalize_node(void * node, void * context, void* tls) {
-	EpochFreeNode(node);
+    EpochFreeNode(node);
 }
 
 skiplist_t* new_skiplist(EpochThread epoch) {
@@ -56,7 +56,7 @@ skiplist_t* new_skiplist(EpochThread epoch) {
 	return sl;
 }
 void delete_skiplist(skiplist_t* sl) {
-	sl_finalize_node((void*)(*sl)->next[0], NULL, NULL);
+	//sl_finalize_node((void*)(*sl)->next[0], NULL, NULL);
 	sl_finalize_node((void*)(*sl), NULL, NULL);
 	free(sl);
 }
@@ -98,12 +98,12 @@ void delete_node(node_t* node) {
 int skiplist_size(skiplist_t* sl) {
 	int size = 0;
 
-	volatile node_t* node = UNMARKED_PTR((*sl)->next[0]);
+	volatile node_t* node = UNMARKED_PTR_ALL((*sl)->next[0]);
 	while (node->next[0] != NULL) {
 		if (!PTR_IS_MARKED(node->next[0])) {
 			size++;
 		}
-		node = UNMARKED_PTR(node->next[0]);
+		node = UNMARKED_PTR_ALL(node->next[0]);
 	}
 
 	return size;
@@ -121,17 +121,18 @@ int sl_search(skiplist_t* sl, skey_t key, volatile node_t** left_nodes, volatile
 retry:
 	left = (*sl);
 	for (i = max_level - 1; i >= 0; i--) {
-		left_next = left->next[i];
+		left_next = (node_t*) unmark_ptr_cache((UINT_PTR)left->next[i]);
 		if (PTR_IS_MARKED(left_next)) {
 			goto retry;
 		}
 
 
 		for (right = left_next; ; right = right_next) {
-			right_next = right->next[i];
+			//right_next = right->next[i];
+		    right_next = (node_t*) unmark_ptr_cache((UINT_PTR)right->next[i]);
 			while ((PTR_IS_MARKED(right_next))) {
 				right = UNMARKED_PTR_ALL(right_next);
-				right_next = right->next[i];
+				right_next = (node_t*) unmark_ptr_cache((UINT_PTR)right->next[i]);
 			}
 
 			if (right->key >= key) {
@@ -196,6 +197,9 @@ retry:
 		}
 	}
 
+#ifndef BUFFERING_ON
+		flush_and_try_unflag((PVOID*)&(left->next[0]));
+#endif // !BUFFERING_ON
 	return (right->key == key);
 }
 
@@ -223,6 +227,10 @@ int sl_search_no_cleanup(skiplist_t* sl, skey_t key, volatile node_t** left_node
 		left_nodes[i] = left;
 		right_nodes[i] = right;
 	}
+#ifndef BUFFERING_ON
+		flush_and_try_unflag((PVOID*)&(left->next[0]));
+#endif // !BUFFERING_ON
+
 	return (right->key == key);
 }
 
@@ -334,7 +342,7 @@ svalue_t skiplist_remove(skiplist_t* sl, skey_t key, EpochThread epoch, linkcach
 #ifdef SIMULATE_NAIVE_IMPLEMENTATION
 		write_data_wait(&(node_to_delete), 1);
 #endif
-		EpochReclaimObject(epoch, (node_t*) node_to_delete, NULL, NULL, sl_finalize_node);
+        EpochReclaimObject(epoch, (node_t*) node_to_delete, NULL, NULL, sl_finalize_node);
 	}
 	EpochEnd(epoch);
 	return result;
@@ -375,7 +383,7 @@ retry:
 	write_data_wait((void*)to_insert, CACHE_LINES_PER_NV_NODE); //we persist the newly allocated data in new_node; 
 
 #ifdef BUFFERING_ON
-	if (cache_try_link_and_add(buffer, key,(volatile void**) &preds[0]->next[0], UNMARKED_PTR(succs[0]), to_insert) == 0) {
+	if (cache_try_link_and_add(buffer, key,(volatile void**) &preds[0]->next[0], UNMARKED_PTR_ALL(succs[0]), to_insert) == 0) {
 		sl_finalize_node((void*)to_insert, NULL, NULL);
 		goto retry;
 	}
@@ -383,7 +391,7 @@ retry:
 	//if a read will happen, the buffer will be flushed
 	//and the recovery procedure can handle links to nodes missing
 #else
-	if ((node_t*)link_and_persist((PVOID*)&(preds[0]->next[0]), (PVOID)UNMARKED_PTR(succs[0]), (PVOID)to_insert) != UNMARKED_PTR(succs[0])) {
+	if ((node_t*)link_and_persist((PVOID*)&(preds[0]->next[0]), (PVOID)UNMARKED_PTR_ALL(succs[0]), (PVOID)to_insert) != UNMARKED_PTR_ALL(succs[0])) {
 //if (CAS_PTR((PVOID*)&preds[0]->next[0], UNMARKED_PTR(succs[0]), (PVOID)to_insert) != UNMARKED_PTR(succs[0])) {
 	//failed to insert the node, so I can actually free it if I want 
 	//there's no chance anyone has a reference to it, right? so I can just call the finalize on it directly
@@ -403,12 +411,16 @@ for (i = 1; i < to_insert->toplevel; i++) {
 
         new_next = to_insert->next[i];
 		if (PTR_IS_MARKED(new_next)) {
+             //fprintf(stderr, "marked 2\n");
+			//sl_search(sl, key+1, NULL, NULL, buffer, epoch);
+			//sl_search(sl, key, NULL, NULL, buffer, epoch);
 			EpochEnd(epoch);
 			return 1;
 		}
 
         //tentative fix for problematic case in the original fraser algorithm
         if ((succ != new_next) && (CAS_PTR(&(to_insert->next[i]), new_next, succ)!= new_next)) {
+            //fprintf(stderr, "case\n");
             EpochEnd(epoch);
             return 1;
         }
@@ -417,6 +429,13 @@ for (i = 1; i < to_insert->toplevel; i++) {
 #ifdef SIMULATE_NAIVE_IMPLEMENTATION
 			write_data_wait((void*)&(pred->next[i]), 1);
 #endif
+            if (PTR_IS_MARKED(to_insert->next[to_insert->toplevel-1])) {
+                //fprintf(stderr, "marked\n");
+		        sl_search(sl, key+1, NULL, NULL, buffer, epoch);
+				//sl_search(sl, key, NULL, NULL, buffer, epoch);
+                EpochEnd(epoch);
+                return 1;
+            }
 			break;
 		}
 		sl_search(sl, key, preds, succs, buffer, epoch);
@@ -508,6 +527,7 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 	int i;
 	int level;
 
+#ifdef ENSURE_WELLFORMED
 
 	//since nodes may take multiple cache lines, it is possible that nodes that are unlinked from the bottom layer
 	//are linked in higher layers; (either at insertion, or when doing unlinking);
@@ -589,6 +609,7 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 	wait_writes();
 	EpochCacheAlignedFree(unlinking_address);
 
+#endif
 	
 	// now go over all the pages in the page buffers and check which of the nodes there are reachable;
 	size_t j;
@@ -598,6 +619,7 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
 
 	page_descriptor_t* crt;
     size_t num_pages;
+    //fprintf(stderr, "size of node is %lu\n",sizeof(node_t));
 
     for (i = 0; i < num_page_buffers; i++) {
         page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
@@ -626,6 +648,6 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
                 }
             }
         }
-        destroy_active_page_table(page_buffers[i]);
+        //destroy_active_page_table(page_buffers[i]);
         }
 }

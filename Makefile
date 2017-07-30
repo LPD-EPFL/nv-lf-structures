@@ -4,9 +4,9 @@ LFS = src/skiplist src/linkedlist src/bst src/bst-aravind src/hashtable
 
 .PHONY:	clean all $(LFS)
 
-default: linkedlist skiplist bst bst-aravind hashtable $(LFS)
+default: linkedlist skiplist bst-aravind hashtable $(LFS)
 
-all:	linkedlist skiplist bst bst-aravind hashtable $(LFS)
+all:	linkedlist skiplist bst-aravind hashtable $(LFS)
 
 
 linkedlist:
