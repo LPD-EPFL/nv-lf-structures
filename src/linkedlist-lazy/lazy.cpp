@@ -70,8 +70,34 @@ parse_insert(intset_l_t *set, skey_t key, svalue_t val, EpochThread epoch)
 	  result = (curr->key != key);
 	  if (result) 
 	    {
+
+    //init log
+   my_log->status = LOG_STATUS_CLEAN;
+   my_log->node1 = NULL;
+   my_log->node2 = NULL;
+  my_log->addr = NULL;
+   write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+
+         //write redo log
+         my_log->node2 = (node_l_t*) GetNextNodeAddress(sizeof(node_l_t));
+         my_log->val2.key = key;
+         my_log->val2.val = val;
+         my_log->val2.next = curr;
+         my_log->val2.marked = 0;
+         my_log->node1 = pred;
+         memcpy((void*)&(my_log->val1), (void*) pred, sizeof(node_l_t));
+         my_log->val1.next = my_log->node2;
+         my_log->addr = (void*)my_log->node2;
+         write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+         //do changes
+
 	      newnode = new_node_and_set_next_l(key, val, curr,0, epoch);
+          write_data_nowait((void*)newnode, 1);
 	      pred->next = newnode;
+          write_data_wait((void*)pred, 1);
+
+          my_log->status = LOG_STATUS_COMMITTED;
+          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 	    } 
 	}
       GL_UNLOCK(set->lock);
@@ -110,12 +136,6 @@ parse_delete(intset_l_t *set, skey_t key, EpochThread epoch)
 	}
 #endif
 
-    //init log
-   my_log->status = LOG_STATUS_CLEAN;
-   my_log->node1 = NULL;
-   my_log->node2 = NULL;
-  my_log->addr = NULL;
-   write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
       GL_LOCK(set->lock);		/* when GL_[UN]LOCK is defined the [UN]LOCK is not ;-) */
       LOCK(ND_GET_LOCK(pred));
@@ -127,23 +147,33 @@ parse_delete(intset_l_t *set, skey_t key, EpochThread epoch)
 	    {
 	      result = curr->val;
 
-         my_log->node1 = pred;
-         memcpy((void*)&(my_log->val1), (void*) pred, sizeof(node_l_t));
+    //init log
+   my_log->status = LOG_STATUS_CLEAN;
+   my_log->node1 = NULL;
+   my_log->node2 = NULL;
+  my_log->addr = NULL;
+   write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+         //write redo log
          my_log->node2 = curr;
          memcpy((void*)&(my_log->val2), (void*) curr, sizeof(node_l_t));
+         my_log->val2.marked = 1;
+         my_log->node1 = pred;
+         memcpy((void*)&(my_log->val1), (void*) pred, sizeof(node_l_t));
+         my_log->val1.next = curr->next;
          my_log->addr = (void*) curr; 
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+         //do changes
 
 	      node_l_t* c_nxt = curr->next;
 	      curr->marked = 1;
 	      pred->next = c_nxt;
-
 		EpochReclaimObject(epoch, (void*)curr, NULL, NULL, finalize_node);
 
           write_data_nowait((void*)curr, 1);
           //write_data_nowait(add addr to allocator);
           write_data_wait((void*)pred, 1);
 
+          //commit
           my_log->status = LOG_STATUS_COMMITTED;
           write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
