@@ -1,8 +1,10 @@
 
 #include "lazy.h"
 
-extern __thread thread_log_t* log;
 
+void finalize_node(void * node, void * context, void* tls) {
+	EpochFreeNode(node);
+}
 /*
  * Checking that both curr and pred are both unmarked and that pred's next pointer
  * points to curr to verify that the entries are adjacent and present in the list.
@@ -68,7 +70,7 @@ parse_insert(intset_l_t *set, skey_t key, svalue_t val, EpochThread epoch)
 	  result = (curr->key != key);
 	  if (result) 
 	    {
-	      newnode = new_node_l(key, val, curr, epoch);
+	      newnode = new_node_and_set_next_l(key, val, curr,0, epoch);
 	      pred->next = newnode;
 	    } 
 	}
@@ -109,11 +111,11 @@ parse_delete(intset_l_t *set, skey_t key, EpochThread epoch)
 #endif
 
     //init log
-   log->status = 0;
-   log->node1 = NULL;
-   log->node2 = NULL;
-   log->addr = NULL;
-   write_data_wait(log, (sizeof(thread_log_t)+63)/64);
+   my_log->status = LOG_STATUS_CLEAN;
+   my_log->node1 = NULL;
+   my_log->node2 = NULL;
+  my_log->addr = NULL;
+   write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
       GL_LOCK(set->lock);		/* when GL_[UN]LOCK is defined the [UN]LOCK is not ;-) */
       LOCK(ND_GET_LOCK(pred));
@@ -125,25 +127,25 @@ parse_delete(intset_l_t *set, skey_t key, EpochThread epoch)
 	    {
 	      result = curr->val;
 
-          log->node1 = pred;
-          log->val1 = *pred;
-          log->node2 = curr;
-          log->val2 = *curr;
-          log->addr = (void*) curr; 
-          write_data_wait(log, (sizeof(thread_log_t)+63)/64);
+         my_log->node1 = pred;
+         memcpy((void*)&(my_log->val1), (void*) pred, sizeof(node_l_t));
+         my_log->node2 = curr;
+         memcpy((void*)&(my_log->val2), (void*) curr, sizeof(node_l_t));
+         my_log->addr = (void*) curr; 
+         write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
 	      node_l_t* c_nxt = curr->next;
 	      curr->marked = 1;
 	      pred->next = c_nxt;
 
-		EpochReclaimObject(epoch, (node_t*)curr, NULL, NULL, finalize_node);
+		EpochReclaimObject(epoch, (void*)curr, NULL, NULL, finalize_node);
 
-          write_data_no_wait(curr, 1);
-          write_data_no_wait(add addr to allocator);
-          write_data_wait(pred, 1);
+          write_data_nowait((void*)curr, 1);
+          //write_data_nowait(add addr to allocator);
+          write_data_wait((void*)pred, 1);
 
-          log->state = finsihed;
-          write_data_wait(log, (sizeof(thread_log_t)+63)/64);
+          my_log->status = LOG_STATUS_COMMITTED;
+          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
 	    }
 	  done = 1;

@@ -1,15 +1,13 @@
 #include "intset.h"
 #include "utils.h"
 
-void finalize_node(void * node, void * context, void* tls) {
-	EpochFreeNode(node);
-}
+__thread thread_log_t* my_log;
 
 node_l_t* new_node_l(skey_t key, svalue_t val, EpochThread epoch){
   volatile node_l_t *the_node;
-	the_node = (node_t*)EpochAllocNode(epoch, sizeof(node_l_t));
+	the_node = (node_l_t*)EpochAllocNode(epoch, sizeof(node_l_t));
 	the_node->key = key;
-	the_node->value = value;
+	the_node->val = val;
 	the_node->next = NULL;
     the_node->marked = 0;
     _mm_sfence();
@@ -17,25 +15,25 @@ node_l_t* new_node_l(skey_t key, svalue_t val, EpochThread epoch){
 }
 
 node_l_t*
-new_node_l(skey_t key, sval_t val, node_l_t* next, int initializing, EpochThread epoch)
+new_node_and_set_next_l(skey_t key, svalue_t val, node_l_t* next, int initializing, EpochThread epoch)
 {
-  volatile node_l_t *node;
-  the_node = (node_t*)EpochAllocNode(epoch, sizeof(node_t));
-  if (node == NULL) 
+  volatile node_l_t *the_node;
+  the_node = (node_l_t*)EpochAllocNode(epoch, sizeof(node_l_t));
+  if (the_node == NULL) 
     {
       perror("malloc @ new_node");
       exit(1);
     }
 
-  node->key = key;
-  node->val = val;
-  node->next = next;
-  node->marked = 0;
+  the_node->key = key;
+  the_node->val = val;
+  the_node->next = next;
+  the_node->marked = 0;
 
-  INIT_LOCK(ND_GET_LOCK(node));
+  INIT_LOCK(ND_GET_LOCK(the_node));
 
  write_data_wait((void*)the_node, CACHE_LINES_PER_NV_NODE);
-  return (node_l_t*) node;
+  return (node_l_t*) the_node;
 }
 
 intset_l_t *set_new_l(EpochThread epoch)

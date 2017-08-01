@@ -6,6 +6,7 @@
 #include <active-page-table.h>
 #include <nv_memory.h>
 #include <nv_utils.h>
+#include <epoch.h>
 #include <getopt.h>
 #include <limits.h>
 #include <pthread.h>
@@ -44,7 +45,7 @@ typedef volatile struct node_l
   volatile ptlock_t lock;	/* 32 */
 #endif
 #if defined(DO_PAD)
-  uint8_t padding[CACHE_LINE_SIZE - sizeof(skey_t) - sizeof(sval_t) - sizeof(struct node*) - sizeof(uint8_t) - sizeof(ptlock_t)];
+  uint8_t padding[CACHE_LINE_SIZE - sizeof(skey_t) - sizeof(svalue_t) - sizeof(struct node*) - sizeof(uint8_t) - sizeof(ptlock_t)];
 #endif
 } node_l_t;
 
@@ -59,7 +60,11 @@ typedef ALIGNED(CACHE_LINE_SIZE) struct intset_l
 #endif
 } intset_l_t;
 
-typedef volatile struct thread_log_t {
+#define LOG_STATUS_CLEAN 0
+#define LOG_STATUS_PENDING 1
+#define LOG_STATUS_COMMITTED 2
+
+typedef struct thread_log_t {
   node_l_t val1;
   node_l_t val2;
   node_l_t* node1; 
@@ -67,6 +72,9 @@ typedef volatile struct thread_log_t {
   void* addr;
   int status;
 } thread_log_t;
+
+
+extern __thread thread_log_t* my_log;
 
 node_l_t* new_node_l(skey_t key, svalue_t val, EpochThread epoch);
 node_l_t* new_node_and_set_next_l(skey_t key, svalue_t val, node_l_t* next, int initializing, EpochThread epoch);

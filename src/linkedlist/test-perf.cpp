@@ -22,6 +22,7 @@
 
 #include "lf-linkedlist.h"
 
+
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
@@ -109,6 +110,8 @@ test(void* thread)
 
   THREAD_INIT(ID);
   PF_INIT(3, SSPFD_NUM_ENTRIES, ID);
+
+
 
 #if defined(COMPUTE_LATENCY)
   volatile ticks my_putting_succ = 0;
@@ -394,6 +397,8 @@ main(int argc, char **argv)
     EpochThread epoch = EpochThreadInit(num_threads);
   DS_TYPE* set = DS_NEW(epoch);
   assert(set != NULL);
+
+
 
   /* Initializes the local data */
   putting_succ = (ticks *) calloc(num_threads , sizeof(ticks));

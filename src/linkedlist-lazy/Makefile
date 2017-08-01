@@ -9,7 +9,7 @@ else
 	CFLAGS += -DRO_FAIL=1
 endif
 
-BINS = $(BINDIR)/lb-ll_lazy$(BIN_SUFFIX)$(SUFFIX)
+BINS = $(BINDIR)/lb-ll_lazy
 PROF = $(ROOT)/src
 
 .PHONY:	all clean
@@ -20,18 +20,18 @@ measurements.o:
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/measurements.o $(PROF)/measurements.c
 
 linkedlist-lock.o: 
-	$(CC) $(CFLAGS) -c -o $(BUILDIR)/linkedlist-lock.o linkedlist-lock.c
+	$(CC) $(CFLAGS) -c -o $(BUILDIR)/linkedlist-lock.o linkedlist-lock.cpp
 
-lazy.o: linkedlist-lock.h linkedlist-lock.o htlock.o clh.o
-	$(CC) $(CFLAGS) -c -o $(BUILDIR)/lazy.o lazy.c	 
+lazy.o: linkedlist-lock.h linkedlist-lock.o 
+	$(CC) $(CFLAGS) -c -o $(BUILDIR)/lazy.o lazy.cpp
 
-intset.o: linkedlist-lock.h lazy.h clh.o
-	$(CC) $(CFLAGS) -c -o $(BUILDIR)/intset.o intset.c
+intset.o: linkedlist-lock.h lazy.h 
+	$(CC) $(CFLAGS) -c -o $(BUILDIR)/intset.o intset.cpp
 
 test.o: linkedlist-lock.h lazy.h intset.h
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/test.o $(TEST_FILE)
 
-main: measurements.o .o linkedlist-lock.o lazy.o intset.o test.o 
+main: measurements.o linkedlist-lock.o lazy.o intset.o test.o 
 	$(CC) $(CFLAGS) $(BUILDIR)/measurements.o $(BUILDIR)/linkedlist-lock.o $(BUILDIR)/lazy.o $(BUILDIR)/intset.o $(BUILDIR)/test.o -o $(BINS) $(LDFLAGS) 
 
 clean:

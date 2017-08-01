@@ -22,6 +22,16 @@
 
 #include "intset.h"
 
+    #define LOG_SIZE    (10 * 1024) /* 10KB */
+    #define LOG_LAYOUT_NAME "log"
+__thread char logpath[32];
+
+static __thread PMEMobjpool *pop;
+
+POBJ_LAYOUT_BEGIN(log);
+POBJ_LAYOUT_ROOT(log, thread_log_t);
+POBJ_LAYOUT_END(log);
+
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
@@ -108,6 +118,34 @@ test(void* thread)
 
   THREAD_INIT(ID);
   PF_INIT(3, SSPFD_NUM_ENTRIES, ID);
+
+    sprintf(logpath, "/home/tmp/log_thread_%u", td->id); //thread id as file name
+
+    //remove file if it exists
+    //TODO might want to remove this instruction in the future
+    remove(logpath);
+
+	pop = NULL;
+
+
+	if (access(logpath, F_OK) != 0) {
+        if ((pop = pmemobj_create(logpath, POBJ_LAYOUT_NAME(log),
+            LOG_SIZE, S_IWUSR | S_IRUSR)) == NULL) {
+            printf("failed to create pool1 wiht name %s\n", logpath);
+            return NULL;
+        }
+    } else {
+        if ((pop = pmemobj_open(logpath, LOG_LAYOUT_NAME)) == NULL) {
+            printf("failed to open pool with name %s\n", logpath);
+            return NULL;
+        }
+    }
+    
+	//zeroed allocation if the object does not exist yet
+    TOID(thread_log_t) log = POBJ_ROOT(pop, thread_log_t);
+
+	//I should now return a pointer to this 
+	thread_log_t* alog = D_RW(log);
 
 #if defined(COMPUTE_LATENCY)
   volatile ticks my_putting_succ = 0;
@@ -218,6 +256,10 @@ test(void* thread)
   EpochThreadShutdown(epoch);
     FlushThread();
 
+
+	pmemobj_close(pop);
+
+    remove(logpath);
   SSPFDTERM();
   THREAD_END();
   pthread_exit(NULL);
