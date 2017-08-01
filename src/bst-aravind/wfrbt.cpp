@@ -47,7 +47,8 @@ Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees
  */
 
 #define PREPROCESSING 0
-#define ESTIMATE_RECOVERY 1
+//#define ESTIMATE_RECOVERY 1
+#define FLUSH_CACHES 1
 
 #define RO                              1
 #define RW                              0
@@ -826,6 +827,16 @@ node_t * newRT = new node_t;
 //#ifdef DO_STATS
   //fprintf(stderr, "marks %u, hits %u\n", page_buffers[args->threadCount]->num_marks, page_buffers[args->threadCount]->hits);
 //#endif
+
+#ifdef FLUSH_CACHES
+#define NUM_EL 8388608
+    volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
+
+    for (i = 0; i < NUM_EL; i++) {
+       elms[i] = i;
+    }
+#endif
+
   volatile ticks corr = getticks_correction_calc();
   ticks startCycles = getticks();
   recover(&data[nb_threads], page_tables, nb_threads);
@@ -846,6 +857,10 @@ node_t * newRT = new node_t;
 
 #ifdef ESTIMATE_RECOVERY
   destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
+
+#ifdef FLUSH_CACHES
+    free((void*)elms);
+#endif
 #endif
 
   free(threads);

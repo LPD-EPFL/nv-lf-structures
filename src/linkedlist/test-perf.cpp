@@ -22,6 +22,8 @@
 
 #include "lf-linkedlist.h"
 
+#define FLUSH_CACHES 1
+
 
 /* ################################################################### *
  * Definition of macros: per data structure
@@ -517,6 +519,17 @@ main(int argc, char **argv)
 //#ifdef DO_STATS
 	//fprintf(stderr, "marks %u, hits %u\n", page_buffers[args->threadCount]->num_marks, page_buffers[args->threadCount]->hits);
 //#endif
+
+
+#ifdef FLUSH_CACHES
+#define NUM_EL 8388608
+    volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
+
+    for (i = 0; i < NUM_EL; i++) {
+       elms[i] = i;
+    }
+#endif
+
     volatile ticks corr = getticks_correction_calc();
 	ticks startCycles = getticks();
 	DS_RECOVER(set, page_tables, num_threads);
@@ -588,6 +601,10 @@ main(int argc, char **argv)
     DS_DELETE(set);
 #ifdef ESTIMATE_RECOVERY
     destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
+
+#ifdef FLUSH_CACHES
+    free((void*)elms);
+#endif
 #endif
 
   cache_destroy(lc);

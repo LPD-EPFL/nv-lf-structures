@@ -22,6 +22,8 @@
 
 #include "lf-skiplist.h"
 
+#define FLUSH_CACHES 1
+
 /* ################################################################### *
  * Definition of macros: per data structure
  * ################################################################### */
@@ -507,6 +509,15 @@ main(int argc, char **argv)
 		fprintf(stderr, "marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
 #endif
 	}
+
+#ifdef FLUSH_CACHES
+#define NUM_EL 8388608
+    volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
+
+    for (i = 0; i < NUM_EL; i++) {
+       elms[i] = i;
+    }
+#endif
 	//page_tables[num_threads] = (active_page_table_t*)GetOpaquePageBuffer(epoch);
 	//fprintf(stderr, "page table %d has %u pages\n", args->threadCount, page_buffers[args->threadCount]->current_size);
 //#ifdef DO_STATS
@@ -583,6 +594,10 @@ main(int argc, char **argv)
     DS_DELETE(set);
 #ifdef ESTIMATE_RECOVERY
 	destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
+
+#ifdef FLUSH_CACHES
+    free((void*)elms);
+#endif
 #endif
 
   cache_destroy(lc);

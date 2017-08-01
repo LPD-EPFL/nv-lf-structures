@@ -650,4 +650,5 @@ void recover(skiplist_t* sl, active_page_table_t** page_buffers, int num_page_bu
         }
         //destroy_active_page_table(page_buffers[i]);
         }
+        
 }
