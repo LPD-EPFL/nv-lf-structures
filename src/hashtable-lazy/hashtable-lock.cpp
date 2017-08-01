@@ -84,16 +84,7 @@ ht_new(EpochThread epoch)
   char path[32];  
   char *uname = cuserid(NULL);
 
-#if defined(LL_GLOBAL_LOCK)
-  size_t ls = (maxhtlength + 1) * sizeof(ptlock_t);
-  ls += CACHE_LINE_SIZE - (ls & CACHE_LINE_SIZE);
-  if ((set->locks = malloc(ls)) == NULL)
-    {
-      perror("malloc locks");
-      exit(1);
-    }  
 
-#endif
   sprintf(path, "/tmp/ht_lb_pool_%s",uname); 
 
   //remove file if it exists
@@ -127,6 +118,17 @@ ht_new(EpochThread epoch)
     set->buckets = D_RW(TX_ALLOC(intset_l_t, bs));
 
   } TX_ONCOMMIT {
+
+#if defined(LL_GLOBAL_LOCK)
+  size_t ls = (maxhtlength + 1) * sizeof(ptlock_t);
+  ls += CACHE_LINE_SIZE - (ls & CACHE_LINE_SIZE);
+  if ((set->locks = (ptlock_t*) malloc(ls)) == NULL)
+    {
+      perror("malloc locks");
+      exit(1);
+    }  
+
+#endif
     int i;
     for (i = 0; i < maxhtlength; i++) {
 #if defined(LL_GLOBAL_LOCK)
