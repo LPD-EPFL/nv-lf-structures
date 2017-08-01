@@ -22,7 +22,7 @@
 
 #include "intset.h"
 
-    #define LOG_SIZE    (10 * 1024) /* 10KB */
+    #define LOG_SIZE    (10* 1024 * 1024) /* 10KB */
     #define LOG_LAYOUT_NAME "log"
 __thread char logpath[32];
 
@@ -119,7 +119,7 @@ test(void* thread)
   THREAD_INIT(ID);
   PF_INIT(3, SSPFD_NUM_ENTRIES, ID);
 
-    sprintf(logpath, "/home/tmp/log_thread_%u", td->id); //thread id as file name
+    sprintf(logpath, "/tmp/log_thread_%u", td->id); //thread id as file name
 
     //remove file if it exists
     //TODO might want to remove this instruction in the future
@@ -145,7 +145,7 @@ test(void* thread)
     TOID(thread_log_t) log = POBJ_ROOT(pop, thread_log_t);
 
 	//I should now return a pointer to this 
-	thread_log_t* alog = D_RW(log);
+	my_log = D_RW(log);
 
 #if defined(COMPUTE_LATENCY)
   volatile ticks my_putting_succ = 0;
