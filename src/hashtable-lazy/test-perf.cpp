@@ -60,6 +60,7 @@ RETRY_STATS_VARS_GLOBAL;
 size_t initial = DEFAULT_INITIAL;
 size_t range = DEFAULT_RANGE; 
 size_t update = DEFAULT_UPDATE;
+size_t load_factor = DEFAULT_LOAD;
 size_t num_threads = DEFAULT_NB_THREADS; 
 size_t duration = DEFAULT_DURATION;
 
@@ -281,6 +282,7 @@ main(int argc, char **argv)
     {"update-rate",               required_argument, NULL, 'u'},
     {"num-buckets",               required_argument, NULL, 'b'},
     {"print-vals",                required_argument, NULL, 'v'},
+    {"load-factor",               required_argument, NULL, 'l'},
     {"vals-pf",                   required_argument, NULL, 'f'},
     {NULL, 0, NULL, 0}
   };
@@ -289,7 +291,7 @@ main(int argc, char **argv)
   while(1) 
     {
       i = 0;
-      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:p:b:v:f:", long_options, &i);
+      c = getopt_long(argc, argv, "hAf:d:i:n:r:s:u:m:a:l:p:b:v:f:", long_options, &i);
 		
       if(c == -1)
 	break;
@@ -322,6 +324,8 @@ main(int argc, char **argv)
 		 "        Range of integer values inserted in set\n"
 		 "  -u, --update-rate <int>\n"
 		 "        Percentage of update transactions\n"
+     "  -l, --load-factor <int>\n"
+     "        Elements per bucket\n"
 		 "  -p, --put-rate <int>\n"
 		 "        Percentage of put update transactions (should be less than percentage of updates)\n"
 		 "  -b, --num-buckets <int>\n"
@@ -353,6 +357,9 @@ main(int argc, char **argv)
 	  break;
 	case 'v':
 	  print_vals_num = atoi(optarg);
+	  break;
+  case 'l':
+    load_factor = atoi(optarg);
 	  break;
 	case 'f':
 	  pf_vals_num = pow2roundup(atoi(optarg)) - 1;
@@ -407,6 +414,7 @@ main(int argc, char **argv)
     }
 
 
+  maxhtlength = (unsigned int) initial / load_factor;
 
   get_rate = 1 - update_rate;
 

@@ -22,7 +22,7 @@
 
 #include "intset.h"
 
-#define ESTIMATE_RECOVERY 1
+//#define ESTIMATE_RECOVERY 1
 
 /* ################################################################### *
  * Definition of macros: per data structure
