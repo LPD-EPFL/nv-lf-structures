@@ -25,6 +25,24 @@ ifeq ($(VERSION),O3)
 	CFLAGS	+= -O3
 endif
 
+# Compile with global lock
+ifeq ($(GRANULARITY),GLOBAL_LOCK)
+     CFLAGS	+= -DLL_GLOBAL_LOCK
+     BIN_SUFFIX = _gl
+endif
+ifeq ($(G),GL)
+     CFLAGS	+= -DLL_GLOBAL_LOCK
+     BIN_SUFFIX = _gl
+endif
+
+ifeq ($(LOCK),)
+  LOCK          ?= TAS
+endif
+
+ifndef STM
+    CFLAGS += -D$(LOCK)
+endif
+
 CFLAGS += -D_GNU_SOURCE
 
 ROOT 		?= ../..
