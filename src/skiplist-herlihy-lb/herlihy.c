@@ -1,37 +1,12 @@
-/*   
- *   File: herlihy.c
- *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
- *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description:  Fine-grained locking skip list.
- *   C implementation of the Herlihy et al. algorithm originally 
- *   designed for managed programming language.
- *   "A Simple Optimistic Skiplist Algorithm" 
- *   M. Herlihy, Y. Lev, V. Luchangco, N. Shavit 
- *   p.124-138, SIROCCO 2007
- *   herlihy.c is part of ASCYLIB
- *
- * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
- * 	     	      Tudor David <tudor.david@epfl.ch>
- *	      	      Distributed Programming Lab (LPD), EPFL
- *
- * ASCYLIB is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation, version 2
- * of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
-
 #include "optimistic.h"
 #include "utils.h"
 
-RETRY_STATS_VARS;
-
 #include "latency.h"
+
+void finalize_node(void * node, void * context, void* tls) {
+	EpochFreeNode(node);
+}
+
 #if LATENCY_PARSING == 1
 __thread size_t lat_parsing_get = 0;
 __thread size_t lat_parsing_put = 0;
@@ -124,10 +99,10 @@ optimistic_left_search(sl_intset_t *set, skey_t key)
  * memory at right places to avoid the use of a stop-the-world garbage 
  * collector. 
  */
-sval_t
+svalue_t
 optimistic_find(sl_intset_t *set, skey_t key)
 { 
-  sval_t result = 0;
+  svalue_t result = 0;
 
   PARSE_START_TS(0);
   sl_node_t* nd = optimistic_left_search(set, key);
@@ -169,7 +144,7 @@ unlock_levels(sl_intset_t* set, sl_node_t **nodes, int highestlevel)
  * Unlocking and freeing the memory are done at the right places.
  */
 int
-optimistic_insert(sl_intset_t *set, skey_t key, sval_t val)
+optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
 {
   sl_node_t *succs[HERLIHY_MAX_MAX_LEVEL], *preds[HERLIHY_MAX_MAX_LEVEL];
   sl_node_t  *node_found, *prev_pred, *new_node;
@@ -232,7 +207,37 @@ optimistic_insert(sl_intset_t *set, skey_t key, sval_t val)
 	  backoff <<= 1;
 	  continue;
 	}
+
+      my_log->status = LOG_STATUS_CLEAN;
+
+      for (i = 0; i < levelmax; i++) {
+          my_log->nodes[i] = NULL;
+      }
+      my_log->addr = NULL;
+      write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+
+
+         //write redo log
+         my_log->nodes[0] = (sl_node_t*) GetNextNodeAddress(sizeof(sl_node_t));
+         my_log->vals[0].key = key;
+         my_log->vals[0].val = val;
+         my_log->vals[0].fullylinked = 1;
+         my_log->vals[0].marked = 0;
+        for (i = 0; i < toplevel; i++)
+      	{
+	     my_log->vals[0].next[i] = succs[i];
+    	}
+
+        for (i = 0; i < toplevel; i++)
+      	{
+	     my_log->nodes[i+1] = preds[i];
+         memcpy((void*)&(my_log->vals[i+1]), (void*) preds[i], sizeof(sl_node_t));
+         my_log->nodes[i+1]->next[i] = new_node;
+    	}
+         my_log->addr = (void*)my_log->nodes[0];
+         write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 		
+      //START OF UPDATES
       new_node = sl_new_simple_node(key, val, toplevel, 0);
 
       for (i = 0; i < toplevel; i++)
@@ -240,16 +245,19 @@ optimistic_insert(sl_intset_t *set, skey_t key, sval_t val)
 	  new_node->next[i] = succs[i];
 	}
 
-#if defined(__tile__)
-      MEM_BARRIER;
-#endif
-
       for (i = 0; i < toplevel; i++)
 	{
 	  preds[i]->next[i] = new_node;
+      write_data_nowait((void*)preds[i], CACHE_LINES_PER_NV_NODE);
 	}
 		
       new_node->fullylinked = 1;
+
+      write_data_wait((void*)new_node, 1);
+      //END OF UPDATES
+
+       my_log->status = LOG_STATUS_COMMITTED;
+       write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
       unlock_levels(set, preds, highest_locked);
       PARSE_END_INC(lat_parsing_put);
@@ -263,7 +271,7 @@ optimistic_insert(sl_intset_t *set, skey_t key, sval_t val)
  * than calling the Java compareTo method of the Comparable interface 
  * (cf. p132 of SIROCCO'07 proceedings).
  */
-sval_t
+svalue_t
 optimistic_delete(sl_intset_t *set, skey_t key)
 {
   sl_node_t *succs[HERLIHY_MAX_MAX_LEVEL], *preds[HERLIHY_MAX_MAX_LEVEL];
@@ -278,6 +286,15 @@ optimistic_delete(sl_intset_t *set, skey_t key)
   backoff = 1;
 	
   PARSE_START_TS(2);
+
+      my_log->status = LOG_STATUS_CLEAN;
+
+      for (i = 0; i < levelmax; i++) {
+          my_log->nodes[i] = NULL;
+      }
+      my_log->addr = NULL;
+      write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+
   while(1)
     {
       UPDATE_TRY();
@@ -304,8 +321,16 @@ optimistic_delete(sl_intset_t *set, skey_t key)
 		  return 0;
 		}
 
+          
+          my_log->nodes[0] = node_todel;
+         memcpy((void*)&(my_log->vals[0]), (void*) node_todel, sizeof(sl_node_t));
+         my_log->vals[1]->marked = 1;
+         write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 	      node_todel->marked = 1;
 	      is_marked = 1;
+          write_data_wait((void*)node_todel, 1);
+          my_log->status = LOG_STATUS_COMMITTED;
+          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 	    }
 
 	  /* Physical deletion */
@@ -337,16 +362,41 @@ optimistic_delete(sl_intset_t *set, skey_t key)
 	      backoff <<= 1;
 	      continue;
 	    }
+
+      my_log->status = LOG_STATUS_CLEAN;
+      write_data_wait(&my_log->status, 1);
+
+        for (i = 0; i < toplevel; i++)
+      	{
+	     my_log->nodes[i+1] = preds[i];
+         memcpy((void*)&(my_log->vals[i+1]), (void*) preds[i], sizeof(sl_node_t));
+         my_log->nodes[i+1]->next[i] = node_todel->next[i];
+    	}
+         my_log->addr = (void*)my_log->nodes[0];
+         write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+
+       //PHYSICAL DELETION START
 			
 	  for (i = (toplevel-1); i >= 0; i--)
 	    {
 	      preds[i]->next[i] = node_todel->next[i];
 	    }
 
-	  sval_t val = node_todel->val;
-#if GC == 1
-	  ssmem_free(alloc, (void*) node_todel);
-#endif
+	  svalue_t val = node_todel->val;
+
+	 EpochReclaimObject(epoch, (void*)node_todel, NULL, NULL, finalize_node);
+
+      for (i = 0; i < toplevel; i++)
+	{
+	  preds[i]->next[i] = new_node;
+      write_data_nowait((void*)preds[i], CACHE_LINES_PER_NV_NODE);
+	}
+
+          write_data_wait((void*)node_todel, CACHE_LINES_PER_NV_NODE);
+
+          my_log->status = LOG_STATUS_COMMITTED;
+          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+     //PHYSICAL DELETION END
 
 	  UNLOCK(ND_GET_LOCK(node_todel));
 	  unlock_levels(set, preds, highest_locked);

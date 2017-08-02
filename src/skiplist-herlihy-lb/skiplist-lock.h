@@ -1,27 +1,9 @@
-/*   
- *   File: skiplist-lock.h
- *   Author: Vincent Gramoli <vincent.gramoli@sydney.edu.au>, 
- *  	     Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description: 
- *   skiplist-lock.h is part of ASCYLIB
- *
- * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
- * 	     	      Tudor David <tudor.david@epfl.ch>
- *	      	      Distributed Programming Lab (LPD), EPFL
- *
- * ASCYLIB is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation, version 2
- * of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
-
 #include <assert.h>
+#include <link-cache.h>
+#include <active-page-table.h>
+#include <nv_memory.h>
+#include <nv_utils.h>
+#include <epoch.h>
 #include <getopt.h>
 #include <limits.h>
 #include <pthread.h>
@@ -36,7 +18,9 @@
 
 #include <atomic_ops.h>
 #include "lock_if.h"
-#include "ssmem.h"
+
+#include "common.h"
+#include "utils.h"
 
 #define DEFAULT_ELASTICITY		4
 #define DEFAULT_ALTERNATE               0
@@ -46,15 +30,17 @@
 #define ALGO_PUGH 2
 
 
+#define DO_PAD 1
+#define CACHE_LINES_PER_NV_NODE 2
+
 extern unsigned int global_seed;
-extern __thread ssmem_allocator_t* alloc;
 
 extern unsigned int levelmax, size_pad_32;
 
 typedef volatile struct sl_node
 {
   skey_t key;
-  sval_t val; 
+  svalue_t val; 
   uint32_t toplevel;
   volatile uint32_t marked;
   volatile uint32_t fullylinked;
@@ -78,16 +64,27 @@ typedef ALIGNED(CACHE_LINE_SIZE) struct sl_intset
 int get_rand_level();
 int floor_log_2(unsigned int n);
 
+#define MAX_NUM_LEVELS 64
+
+typedef struct thread_log_t {
+  node_l_t vals[MAX_NUM_LEVELS+1];
+  node_l_t* nodes[MAX_NUM_LEVELS+1];
+  void* addr;
+  int status;
+} thread_log_t;
+
+extern __thread thread_log_t* my_log;
+
 /* 
  * Create a new node without setting its next fields. 
  */
-sl_node_t* sl_new_simple_node(skey_t key, sval_t val, int toplevel, int transactional);
+sl_node_t* sl_new_simple_node(skey_t key, svalue_t val, int toplevel, int transactional, EpochThread epoch);
 /* 
  * Create a new node with its next field. 
  * If next=NULL, then this create a tail node. 
  */
-sl_node_t *sl_new_node(skey_t key, sval_t val, sl_node_t *next, int toplevel, int transactional);
-void sl_delete_node(sl_node_t* n);
-sl_intset_t* sl_set_new();
-void sl_set_delete(sl_intset_t* set);
+sl_node_t *sl_new_node(skey_t key, svalue_t val, sl_node_t *next, int toplevel, int transactional, EpochThread epoch);
+void sl_delete_node(sl_node_t* n, EpochThread epoch);
+sl_intset_t* sl_set_new(EpochThread epoch);
+void sl_set_delete(sl_intset_t* set,);
 int sl_set_size(sl_intset_t* cset);
