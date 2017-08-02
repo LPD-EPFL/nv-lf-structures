@@ -1,29 +1,12 @@
-/*   
- *   File: bst.h
- *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description: 
- *   bst.h is part of ASCYLIB
- *
- * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
- * 	     	      Tudor David <tudor.david@epfl.ch>
- *	      	      Distributed Programming Lab (LPD), EPFL
- *
- * ASCYLIB is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation, version 2
- * of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
-
 #ifndef _H_BST_TK_
 #define _H_BST_TK_
 
 #include <assert.h>
+#include <link-cache.h>
+#include <active-page-table.h>
+#include <nv_memory.h>
+#include <nv_utils.h>
+#include <epoch.h>
 #include <getopt.h>
 #include <limits.h>
 #include <pthread.h>
@@ -39,13 +22,12 @@
 
 #include "common.h"
 #include "utils.h"
-#include "measurements.h"
-#include "ssalloc.h"
-#include "ssmem.h"
+//#include "measurements.h"
+
+#define DO_PAD 1
+#define CACHE_LINES_PER_NV_NODE 1
 
 static volatile int stop;
-extern __thread ssmem_allocator_t* alloc;
-
 
 typedef union tl32
 {
@@ -133,7 +115,7 @@ typedef struct node
   skey_t key;
   union
   {
-    sval_t val;
+    svalue_t val;
     volatile uint64_t leaf;
   };
   volatile struct node* left;
@@ -148,9 +130,28 @@ typedef ALIGNED(CACHE_LINE_SIZE) struct intset
   node_t* head;
 } intset_t;
 
-node_t* new_node(skey_t key, sval_t val, node_t* l, node_t* r, int initializing);
-node_t* new_node_no_init();
-intset_t* set_new();
+#define LOG_STATUS_CLEAN 0
+#define LOG_STATUS_PENDING 1
+#define LOG_STATUS_COMMITTED 2
+
+typedef struct thread_log_t {
+  node_t val1;
+  node_t val2;
+  node_t val3;
+  node_t* node1; 
+  node_t* node2; 
+  node_t* node3; 
+  void* addr1;
+  void* addr2
+  int status;
+} thread_log_t;
+
+
+extern __thread thread_log_t* my_log;
+
+node_t* new_node(skey_t key, svalue_t val, node_t* l, node_t* r, int initializing, EpochThread epoch);
+node_t* new_node_no_init(EpochThread epoch);
+intset_t* set_new(EpochThread epoch);
 void set_delete(intset_t* set);
 int set_size(intset_t* set);
 void node_delete(node_t* node);

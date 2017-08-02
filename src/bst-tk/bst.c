@@ -1,46 +1,14 @@
-/*   
- *   File: bst.c
- *   Author: Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>
- *   Description: 
- *   bst.c is part of ASCYLIB
- *
- * Copyright (c) 2014 Vasileios Trigonakis <vasileios.trigonakis@epfl.ch>,
- * 	     	      Tudor David <tudor.david@epfl.ch>
- *	      	      Distributed Programming Lab (LPD), EPFL
- *
- * ASCYLIB is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation, version 2
- * of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- */
-
 #include "intset.h"
 #include "utils.h"
 
-__thread ssmem_allocator_t* alloc;
+__thread thread_log_t* my_log;
 
 node_t*
-new_node(skey_t key, sval_t val, node_t* l, node_t* r, int initializing)
+new_node(skey_t key, svalue_t val, node_t* l, node_t* r, int initializing, EpochThread epoch)
 {
   node_t* node;
-#if GC == 1
-  if (likely(!initializing))		/* for initialization AND the coupling algorithm */
-    {
-      node = (node_t*) ssmem_alloc(alloc, sizeof(node_t));
-    }
-  else
-    {
-      node = (node_t*) ssalloc(sizeof(node_t));
-    }
-#else
-  node = (node_t*) ssalloc(sizeof(node_t));
-#endif
+
+	node = (node_t*)EpochAllocNode(epoch, sizeof(node_t));
   
   if (node == NULL) 
     {
@@ -54,18 +22,15 @@ new_node(skey_t key, sval_t val, node_t* l, node_t* r, int initializing)
   node->right = r;
   node->lock.to_uint64 = 0;
 
+ write_data_wait((void*)the_node, CACHE_LINES_PER_NV_NODE);
   return (node_t*) node;
 }
 
 node_t*
-new_node_no_init()
+new_node_no_init(EpochThread epoch)
 {
   node_t* node;
-#if GC == 1
-  node = (node_t*) ssmem_alloc(alloc, sizeof(node_t));
-#else
-  node = (node_t*) ssalloc(sizeof(node_t));
-#endif
+  node = (node_t*)EpochAllocNode(epoch, sizeof(node_t));
   if (unlikely(node == NULL))
     {
       perror("malloc @ new_node");
@@ -74,17 +39,17 @@ new_node_no_init()
 
   node->val = 0;
   node->lock.to_uint64 = 0;
-
+    _mm_sfence();
   return (node_t*) node;
 }
 
 
 
-intset_t* set_new()
+intset_t* set_new(EpochThread epoch)
 {
   intset_t *set;
 
-  if ((set = (intset_t *)ssalloc_aligned(CACHE_LINE_SIZE, sizeof(intset_t))) == NULL) 
+  if ((set = (intset_t *)malloc(sizeof(intset_t))) == NULL) 
     {
       perror("malloc");
       exit(1);
@@ -100,11 +65,11 @@ intset_t* set_new()
 void
 node_delete(node_t *node) 
 {
-#if GC == 1
-  ssmem_free(alloc, node);
-#else
-  /* ssfree(node); */
-#endif
+/*#if GC == 1*/
+  /*ssmem_free(alloc, node);*/
+/*#else*/
+  /*[> ssfree(node); <]*/
+/*#endif*/
 }
 
 void

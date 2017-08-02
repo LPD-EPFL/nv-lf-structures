@@ -208,13 +208,13 @@ optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
 	  continue;
 	}
 
-      my_log->status = LOG_STATUS_CLEAN;
+      /*my_log->status = LOG_STATUS_CLEAN;*/
 
       for (i = 0; i < levelmax; i++) {
           my_log->nodes[i] = NULL;
       }
       my_log->addr = NULL;
-      write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+      /*write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);*/
 
 
          //write redo log
@@ -237,6 +237,8 @@ optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
          my_log->addr = (void*)my_log->nodes[0];
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 		
+        my_log->status = LOG_STATUS_PENDING;
+        write_data_wait(&my_log->status,1);
       //START OF UPDATES
       new_node = sl_new_simple_node(key, val, toplevel, 0);
 
@@ -287,13 +289,13 @@ optimistic_delete(sl_intset_t *set, skey_t key)
 	
   PARSE_START_TS(2);
 
-      my_log->status = LOG_STATUS_CLEAN;
+      /*my_log->status = LOG_STATUS_CLEAN;*/
 
       for (i = 0; i < levelmax; i++) {
           my_log->nodes[i] = NULL;
       }
       my_log->addr = NULL;
-      write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+      /*write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);*/
 
   while(1)
     {
@@ -326,6 +328,8 @@ optimistic_delete(sl_intset_t *set, skey_t key)
          memcpy((void*)&(my_log->vals[0]), (void*) node_todel, sizeof(sl_node_t));
          my_log->vals[1]->marked = 1;
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+        my_log->status = LOG_STATUS_PENDING;
+        write_data_wait(&my_log->status,1);
 	      node_todel->marked = 1;
 	      is_marked = 1;
           write_data_wait((void*)node_todel, 1);
@@ -363,8 +367,8 @@ optimistic_delete(sl_intset_t *set, skey_t key)
 	      continue;
 	    }
 
-      my_log->status = LOG_STATUS_CLEAN;
-      write_data_wait(&my_log->status, 1);
+      /*my_log->status = LOG_STATUS_CLEAN;*/
+      /*write_data_wait(&my_log->status, 1);*/
 
         for (i = 0; i < toplevel; i++)
       	{
@@ -375,6 +379,8 @@ optimistic_delete(sl_intset_t *set, skey_t key)
          my_log->addr = (void*)my_log->nodes[0];
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
+        my_log->status = LOG_STATUS_PENDING;
+        write_data_wait(&my_log->status,1);
        //PHYSICAL DELETION START
 			
 	  for (i = (toplevel-1); i >= 0; i--)

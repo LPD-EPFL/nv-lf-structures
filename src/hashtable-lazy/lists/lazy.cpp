@@ -72,11 +72,11 @@ parse_insert(intset_l_t *set, skey_t key, svalue_t val, EpochThread epoch)
 	    {
 
     //init log
-   my_log->status = LOG_STATUS_CLEAN;
+   //my_log->status = LOG_STATUS_CLEAN;
    my_log->node1 = NULL;
    my_log->node2 = NULL;
   my_log->addr = NULL;
-   write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+   //write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
 
          //write redo log
          my_log->node2 = (node_l_t*) GetNextNodeAddress(sizeof(node_l_t));
@@ -89,6 +89,9 @@ parse_insert(intset_l_t *set, skey_t key, svalue_t val, EpochThread epoch)
          my_log->val1.next = my_log->node2;
          my_log->addr = (void*)my_log->node2;
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+
+        my_log->status = LOG_STATUS_PENDING;
+        write_data_wait(&my_log->status,1);
          //do changes
 
 	      newnode = new_node_and_set_next_l(key, val, curr,0, epoch);
@@ -148,11 +151,11 @@ parse_delete(intset_l_t *set, skey_t key, EpochThread epoch)
 	      result = curr->val;
 
     //init log
-   my_log->status = LOG_STATUS_CLEAN;
+   //my_log->status = LOG_STATUS_CLEAN;
    my_log->node1 = NULL;
    my_log->node2 = NULL;
   my_log->addr = NULL;
-   write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+   //write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
          //write redo log
          my_log->node2 = curr;
          memcpy((void*)&(my_log->val2), (void*) curr, sizeof(node_l_t));
@@ -162,6 +165,8 @@ parse_delete(intset_l_t *set, skey_t key, EpochThread epoch)
          my_log->val1.next = curr->next;
          my_log->addr = (void*) curr; 
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
+        my_log->status = LOG_STATUS_PENDING;
+        write_data_wait(&my_log->status,1);
          //do changes
 
 	      node_l_t* c_nxt = curr->next;

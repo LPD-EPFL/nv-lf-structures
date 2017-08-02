@@ -66,9 +66,12 @@ int floor_log_2(unsigned int n);
 
 #define MAX_NUM_LEVELS 64
 
+#define LOG_STATUS_CLEAN 0
+#define LOG_STATUS_PENDING 1
+#define LOG_STATUS_COMMITTED 2
 typedef struct thread_log_t {
-  node_l_t vals[MAX_NUM_LEVELS+1];
-  node_l_t* nodes[MAX_NUM_LEVELS+1];
+  sl_node_t vals[MAX_NUM_LEVELS+1];
+  sl_node_t* nodes[MAX_NUM_LEVELS+1];
   void* addr;
   int status;
 } thread_log_t;
