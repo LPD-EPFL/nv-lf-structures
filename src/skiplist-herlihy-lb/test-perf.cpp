@@ -46,7 +46,7 @@ POBJ_LAYOUT_END(log);
 #define DS_IS_REACHABLE(s,a) 
 #define DS_RECOVER(s,p,n) 
 
-#define DS_TYPE             intset_t
+#define DS_TYPE             sl_intset_t
 #define DS_NODE             sl_node_t
 #define DS_KEY              skey_t
 
@@ -169,7 +169,6 @@ test(void* thread)
 #endif
     
   seeds = seed_rand();
-    
   EpochThread epoch = EpochThreadInit(ID);
 	td->page_table = (active_page_table_t*)GetOpaquePageBuffer(epoch);
 
@@ -426,6 +425,10 @@ main(int argc, char **argv)
     
   stop = 0;
 
+
+   levelmax = floor_log_2((unsigned int) initial); 
+ size_pad_32 = sizeof(sl_node_t) + (levelmax * sizeof(sl_node_t *));
+ while (size_pad_32 & 31) size_pad_32++;
 
 	EpochGlobalInit(NULL);
 

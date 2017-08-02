@@ -2,6 +2,7 @@ ROOT = ../..
 
 include $(ROOT)/common/Makefile.common
 
+
 ALGO_O = herlihy.o
 ALGO_C = herlihy.c
 
@@ -15,20 +16,21 @@ all:	main
 measurements.o:
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/measurements.o $(PROF)/measurements.c
 
-skiplist-lock.o: 
+skiplist-lock.o:
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/skiplist-lock.o skiplist-lock.c
 
-herlihy.o: skiplist-lock.h skiplist-lock.o 
-	$(CC) $(CFLAGS) -c -o $(BUILDIR)/herlihy.o herlihy.c
+$(ALGO_O): skiplist-lock.h 
+	$(CC) $(CFLAGS) -c -o $(BUILDIR)/$(ALGO_O) $(ALGO_C)
 
-intset.o: skiplist-lock.h herlihy.h 
+intset.o: skiplist-lock.h optimistic.h 
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/intset.o intset.c
 
-test.o: skiplist-lock.h herlihy.h intset.h
+test.o: skiplist-lock.h optimistic.h intset.h
 	$(CC) $(CFLAGS) -c -o $(BUILDIR)/test.o $(TEST_FILE)
 
-main: measurements.o skiplist-lock.o herlihy.o intset.o test.o 
-	$(CC) $(CFLAGS) $(BUILDIR)/measurements.o $(BUILDIR)/skiplist-lock.o $(BUILDIR)/herlihy.o $(BUILDIR)/intset.o $(BUILDIR)/test.o -o $(BINS) $(LDFLAGS) 
+main: measurements.o skiplist-lock.o $(ALGO_O) intset.o test.o
+	$(CC) $(CFLAGS) $(BUILDIR)/measurements.o $(BUILDIR)/skiplist-lock.o $(BUILDIR)/$(ALGO_O) $(BUILDIR)/intset.o $(BUILDIR)/test.o -o $(BINS) $(LDFLAGS)
 
 clean:
-	rm -f $(BINS)
+	-rm -f $(BINS) *.o
+

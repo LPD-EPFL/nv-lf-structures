@@ -89,5 +89,5 @@ sl_node_t* sl_new_simple_node(skey_t key, svalue_t val, int toplevel, int transa
 sl_node_t *sl_new_node(skey_t key, svalue_t val, sl_node_t *next, int toplevel, int transactional, EpochThread epoch);
 void sl_delete_node(sl_node_t* n, EpochThread epoch);
 sl_intset_t* sl_set_new(EpochThread epoch);
-void sl_set_delete(sl_intset_t* set,);
+void sl_set_delete(sl_intset_t* set);
 int sl_set_size(sl_intset_t* cset);

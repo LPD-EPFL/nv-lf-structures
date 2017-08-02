@@ -4,20 +4,8 @@
 unsigned int levelmax;
 unsigned int size_pad_32;
 
-inline int
-get_rand_level()
-{
-  int i, level = 1;
-  for (i = 0; i < levelmax - 1; i++) 
-    {
-      if ((rand_range(100)-1) < 50)
-	level++;
-      else
-	break;
-    }
-  /* 1 <= level <= levelmax */
-  return level;
-}
+__thread thread_log_t* my_log;
+
 
 int
 floor_log_2(unsigned int n) 
@@ -48,7 +36,7 @@ sl_new_simple_node(skey_t key, svalue_t val, int toplevel, int transactional, Ep
 	}
 #  endif
       node = (sl_node_t*) EpochAllocNode(epoch, ns);
-    }
+    
 
   node->key = key;
   node->val = val;
@@ -72,7 +60,7 @@ sl_new_node(skey_t key, svalue_t val, sl_node_t *next, int toplevel, int transac
   sl_node_t *node;
   int i;
 	
-  node = sl_new_simple_node(key, val, toplevel, transactional);
+  node = sl_new_simple_node(key, val, toplevel, transactional, epoch);
 	
   for (i = 0; i < toplevel; i++)
     node->next[i] = next;

@@ -1,27 +1,27 @@
 #include "intset.h"
 #include "utils.h"
 
-inline svalue_t
-sl_contains(sl_intset_t *set, skey_t key, EpochThread epoch)
+svalue_t sl_contains(sl_intset_t *set, skey_t key, EpochThread epoch)
 {
   EpochStart(epoch);
-  return optimistic_find(set, key);
+  svalue_t val = optimistic_find(set, key, epoch);
   EpochEnd(epoch);
+  return val;
 }
 
-inline int
-sl_add(sl_intset_t *set, skey_t key, svalue_t val, EpochThread epoch)
+int sl_add(sl_intset_t *set, skey_t key, svalue_t val, EpochThread epoch)
 {  
   EpochStart(epoch);
-  return optimistic_insert(set, key, val);
+  int ret = optimistic_insert(set, key, val, epoch);
   EpochEnd(epoch);
+  return ret;
 
 }
 
-inline svalue_t
-sl_remove(sl_intset_t *set, skey_t key, EpochThread epoch)
+svalue_t sl_remove(sl_intset_t *set, skey_t key, EpochThread epoch)
 {
   EpochStart(epoch);
-  return optimistic_delete(set, key);
+  svalue_t val =  optimistic_delete(set, key, epoch);
   EpochEnd(epoch);
+  return val;
 }

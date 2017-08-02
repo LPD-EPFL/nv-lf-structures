@@ -1,8 +1,22 @@
-#include "optimistic.h"
+#include "herlihy.h"
 #include "utils.h"
 
 #include "latency.h"
 
+inline int
+get_rand_level()
+{
+  int i, level = 1;
+  for (i = 0; i < levelmax - 1; i++) 
+    {
+      if ((rand_range(100)-1) < 50)
+	level++;
+      else
+	break;
+    }
+  /* 1 <= level <= levelmax */
+  return level;
+}
 void finalize_node(void * node, void * context, void* tls) {
 	EpochFreeNode(node);
 }
@@ -100,7 +114,7 @@ optimistic_left_search(sl_intset_t *set, skey_t key)
  * collector. 
  */
 svalue_t
-optimistic_find(sl_intset_t *set, skey_t key)
+optimistic_find(sl_intset_t *set, skey_t key, EpochThread epoch)
 { 
   svalue_t result = 0;
 
@@ -144,7 +158,7 @@ unlock_levels(sl_intset_t* set, sl_node_t **nodes, int highestlevel)
  * Unlocking and freeing the memory are done at the right places.
  */
 int
-optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
+optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val, EpochThread epoch)
 {
   sl_node_t *succs[HERLIHY_MAX_MAX_LEVEL], *preds[HERLIHY_MAX_MAX_LEVEL];
   sl_node_t  *node_found, *prev_pred, *new_node;
@@ -232,7 +246,7 @@ optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
       	{
 	     my_log->nodes[i+1] = preds[i];
          memcpy((void*)&(my_log->vals[i+1]), (void*) preds[i], sizeof(sl_node_t));
-         my_log->nodes[i+1]->next[i] = new_node;
+         my_log->nodes[i+1]->next[i] = my_log->nodes[0];
     	}
          my_log->addr = (void*)my_log->nodes[0];
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
@@ -240,7 +254,7 @@ optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
         my_log->status = LOG_STATUS_PENDING;
         write_data_wait(&my_log->status,1);
       //START OF UPDATES
-      new_node = sl_new_simple_node(key, val, toplevel, 0);
+      new_node = sl_new_simple_node(key, val, toplevel, 0, epoch);
 
       for (i = 0; i < toplevel; i++)
 	{
@@ -274,7 +288,7 @@ optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val)
  * (cf. p132 of SIROCCO'07 proceedings).
  */
 svalue_t
-optimistic_delete(sl_intset_t *set, skey_t key)
+optimistic_delete(sl_intset_t *set, skey_t key, EpochThread epoch)
 {
   sl_node_t *succs[HERLIHY_MAX_MAX_LEVEL], *preds[HERLIHY_MAX_MAX_LEVEL];
   sl_node_t *node_todel, *prev_pred; 
@@ -326,7 +340,7 @@ optimistic_delete(sl_intset_t *set, skey_t key)
           
           my_log->nodes[0] = node_todel;
          memcpy((void*)&(my_log->vals[0]), (void*) node_todel, sizeof(sl_node_t));
-         my_log->vals[1]->marked = 1;
+         my_log->vals[1].marked = 1;
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
         my_log->status = LOG_STATUS_PENDING;
         write_data_wait(&my_log->status,1);
@@ -386,17 +400,13 @@ optimistic_delete(sl_intset_t *set, skey_t key)
 	  for (i = (toplevel-1); i >= 0; i--)
 	    {
 	      preds[i]->next[i] = node_todel->next[i];
+      write_data_nowait((void*)preds[i], CACHE_LINES_PER_NV_NODE);
 	    }
 
 	  svalue_t val = node_todel->val;
 
-	 EpochReclaimObject(epoch, (void*)node_todel, NULL, NULL, finalize_node);
+     EpochReclaimObject(epoch, (void*)node_todel, NULL, NULL, finalize_node);
 
-      for (i = 0; i < toplevel; i++)
-	{
-	  preds[i]->next[i] = new_node;
-      write_data_nowait((void*)preds[i], CACHE_LINES_PER_NV_NODE);
-	}
 
           write_data_wait((void*)node_todel, CACHE_LINES_PER_NV_NODE);
 
