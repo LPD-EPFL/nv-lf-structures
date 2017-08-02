@@ -27,7 +27,7 @@
 #define DO_PAD 1
 #define CACHE_LINES_PER_NV_NODE 1
 
-static volatile int stop;
+//static volatile int stop;
 
 typedef union tl32
 {
@@ -142,7 +142,7 @@ typedef struct thread_log_t {
   node_t* node2; 
   node_t* node3; 
   void* addr1;
-  void* addr2
+  void* addr2;
   int status;
 } thread_log_t;
 

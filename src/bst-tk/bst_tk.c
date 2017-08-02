@@ -225,8 +225,8 @@ bst_tk_insert(intset_t* set, skey_t key, svalue_t val, EpochThread epoch)
    /*write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);*/
 
    //write redo log
-   my_log->node2 = (node_l_t*) GetNextNodeAddress(sizeof(node_t));
-   my_log->node1 = (node_l_t*) GetNextNodeAddress(sizeof(node_t));
+   my_log->node2 = (node_t*) GetNextNodeAddress(sizeof(node_t));
+   my_log->node1 = (node_t*) GetNextNodeAddress(sizeof(node_t));
 
    my_log->val2.key = key;
    my_log->val2.val = val;
@@ -270,8 +270,8 @@ bst_tk_insert(intset_t* set, skey_t key, svalue_t val, EpochThread epoch)
    my_log->status = LOG_STATUS_PENDING;
    write_data_wait(&my_log->status,1);
 
-  node_t* nn = new_node(key, val, NULL, NULL, 0);
-  node_t* nr = new_node_no_init();
+  node_t* nn = new_node(key, val, NULL, NULL, 0, epoch);
+  node_t* nr = new_node_no_init(epoch);
 
   if (key < curr->key)
     {

@@ -22,7 +22,7 @@ new_node(skey_t key, svalue_t val, node_t* l, node_t* r, int initializing, Epoch
   node->right = r;
   node->lock.to_uint64 = 0;
 
- write_data_wait((void*)the_node, CACHE_LINES_PER_NV_NODE);
+ write_data_wait((void*)node, CACHE_LINES_PER_NV_NODE);
   return (node_t*) node;
 }
 
@@ -55,10 +55,12 @@ intset_t* set_new(EpochThread epoch)
       exit(1);
     }
 
-  node_t* min = new_node(INT_MIN, 1, NULL, NULL, 1);
-  node_t* max = new_node(INT_MAX, 1, NULL, NULL, 1);
-  set->head = new_node(INT_MAX, 0, min, max, 1);
+ EpochStart(epoch);
+  node_t* min = new_node(INT_MIN, 1, NULL, NULL, 1, epoch);
+  node_t* max = new_node(INT_MAX, 1, NULL, NULL, 1, epoch);
+  set->head = new_node(INT_MAX, 0, min, max, 1, epoch);
   MEM_BARRIER;
+ EpochEnd(epoch);
   return set;
 }
 
