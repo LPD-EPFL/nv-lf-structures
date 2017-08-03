@@ -62,8 +62,10 @@ sl_new_node(skey_t key, svalue_t val, sl_node_t *next, int toplevel, int transac
 	
   node = sl_new_simple_node(key, val, toplevel, transactional, epoch);
 	
-  for (i = 0; i < toplevel; i++)
+  for (i = 0; i < toplevel; i++){
     node->next[i] = next;
+    }
+
 
   write_data_wait((void*)node, CACHE_LINES_PER_NV_NODE);
   return node;

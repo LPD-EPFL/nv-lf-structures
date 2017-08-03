@@ -237,20 +237,21 @@ optimistic_insert(sl_intset_t *set, skey_t key, svalue_t val, EpochThread epoch)
          my_log->vals[0].val = val;
          my_log->vals[0].fullylinked = 1;
          my_log->vals[0].marked = 0;
+         my_log->vals[0].toplevel = toplevel;
         for (i = 0; i < toplevel; i++)
-      	{
-	     my_log->vals[0].next[i] = succs[i];
-    	}
+          {
+         my_log->vals[0].next[i] = succs[i];
+        }
 
         for (i = 0; i < toplevel; i++)
-      	{
-	     my_log->nodes[i+1] = preds[i];
+          {
+         my_log->nodes[i+1] = preds[i];
          memcpy((void*)&(my_log->vals[i+1]), (void*) preds[i], sizeof(sl_node_t));
-         my_log->nodes[i+1]->next[i] = my_log->nodes[0];
-    	}
+         my_log->vals[i+1].next[i] = my_log->nodes[0];
+        }
          my_log->addr = (void*)my_log->nodes[0];
          write_data_wait(my_log, (sizeof(thread_log_t)+63)/64);
-		
+        
         my_log->status = LOG_STATUS_PENDING;
         write_data_wait(&my_log->status,1);
       //START OF UPDATES
