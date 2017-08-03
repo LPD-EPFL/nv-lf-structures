@@ -53,6 +53,7 @@ typedef volatile struct sl_node
   volatile struct sl_node* next[1];
 } sl_node_t;
 
+
 typedef ALIGNED(CACHE_LINE_SIZE) struct sl_intset 
 {
   sl_node_t *head;
@@ -66,11 +67,16 @@ int floor_log_2(unsigned int n);
 
 #define MAX_NUM_LEVELS 64
 
+typedef union lognode {
+    sl_node_t nd;
+    char chars[sizeof(sl_node_t) + sizeof(void*) * MAX_NUM_LEVELS];
+} lognode_t;
 #define LOG_STATUS_CLEAN 0
 #define LOG_STATUS_PENDING 1
 #define LOG_STATUS_COMMITTED 2
+
 typedef struct thread_log_t {
-  sl_node_t vals[MAX_NUM_LEVELS+1];
+  lognode_t vals[MAX_NUM_LEVELS+1];
   sl_node_t* nodes[MAX_NUM_LEVELS+1];
   void* addr;
   int status;
