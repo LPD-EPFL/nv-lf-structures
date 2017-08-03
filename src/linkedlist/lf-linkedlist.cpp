@@ -110,12 +110,14 @@ static inline int delete_right(volatile node_t* left, volatile node_t* right, Ep
 
 static inline volatile node_t* search(linkedlist_t* ll, skey_t key, volatile node_t** left_ptr, EpochThread epoch, linkcache_t* buffer) {
 	volatile node_t* left = *ll;
+	volatile node_t* leftp = *ll;
 	volatile node_t* right = (node_t*)unmark_ptr_cache((uintptr_t)(*ll)->next);
 	while (1) {
 		if (!PTR_IS_MARKED(right->next)) {
 			if (right->key >= key) {
 				break;
 			}
+            leftp=left;
 			left = right;
 		}
 		else {
@@ -125,6 +127,12 @@ static inline volatile node_t* search(linkedlist_t* ll, skey_t key, volatile nod
 		right = (volatile node_t*) unmark_ptr_cache((UINT_PTR)right);
 	}
 	*left_ptr = left;
+
+#ifdef BUFFERING_ON
+            cache_scan(buffer, leftp->key);
+#else
+			flush_and_try_unflag((PVOID*)&(leftp->next));
+#endif
 	return right;
 }
 
@@ -156,12 +164,12 @@ svalue_t linkedlist_remove(linkedlist_t* ll, skey_t key, EpochThread epoch, link
 	do {
 		right = search(ll, key, &left, epoch, buffer);
 
-		if (right->key != key) {
 #ifdef BUFFERING_ON
             cache_scan(buffer, key);
 #else
 			flush_and_try_unflag((PVOID*)&(left->next));
 #endif
+		if (right->key != key) {
 			EpochEnd(epoch);
 			return 0;
 		}
@@ -213,12 +221,12 @@ int linkedlist_insert(linkedlist_t* ll, skey_t key, svalue_t val, EpochThread ep
 		volatile node_t* left;
 		volatile node_t* right = search(ll,key,&left, epoch, buffer);
 
-		if (right->key == key) {
 #ifdef BUFFERING_ON
 			cache_scan(buffer, key);
 #else
 			flush_and_try_unflag((PVOID*)&(left->next));
 #endif
+		if (right->key == key) {
 			EpochEnd(epoch);
 			return 0;
 		}
