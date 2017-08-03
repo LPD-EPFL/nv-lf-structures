@@ -203,20 +203,27 @@ retry:
         }
     }
 
-#ifndef BUFFERING_ON
-    flush_and_try_unflag((PVOID*)&(left->next[0]));
+
+#ifdef BUFFERING_ON
+        if (buffer != NULL) {
+            cache_scan(buffer, key);
+        }
+#else
+        flush_and_try_unflag((PVOID*)&(left->next[0]));
 #endif // !BUFFERING_ON
     return (right->key == key);
 }
 
 //search with no cleanup, retrieves both the predecessors and the successors of the searched node
-int sl_search_no_cleanup(skiplist_t* sl, skey_t key, volatile node_t** left_nodes, volatile node_t** right_nodes) {
+int sl_search_no_cleanup(skiplist_t* sl, skey_t key, volatile node_t** left_nodes, volatile node_t** right_nodes, linkcache_t* buffer) {
     int i;
     volatile node_t *left;
     volatile node_t* right = NULL;
     volatile node_t* left_next;
+    volatile node_t* lpred;
 
     left = (*sl);
+    lpred = (*sl);
 
     for (i = max_level - 1; i >= 0; i--) {
         left_next = UNMARKED_PTR_ALL(left->next[i]);
@@ -226,6 +233,7 @@ int sl_search_no_cleanup(skiplist_t* sl, skey_t key, volatile node_t** left_node
                 if (right->key >= key) {
                     break;
                 }
+                lpred = left;
                 left = right;
             }
             right = UNMARKED_PTR_ALL(right->next[i]);
@@ -233,21 +241,30 @@ int sl_search_no_cleanup(skiplist_t* sl, skey_t key, volatile node_t** left_node
         left_nodes[i] = left;
         right_nodes[i] = right;
     }
-#ifndef BUFFERING_ON
-    flush_and_try_unflag((PVOID*)&(left->next[0]));
+
+#ifdef BUFFERING_ON
+        if (buffer != NULL) {
+            cache_scan(buffer, left->key);
+            cache_scan(buffer, key);
+        }
+#else
+        flush_and_try_unflag((PVOID*)&(left->next[0]));
+        flush_and_try_unflag((PVOID*)&(lpred->next[0]));
 #endif // !BUFFERING_ON
 
     return (right->key == key);
 }
 
 //simple search, does not do any cleanup, only sets the successors of the retrieved node
-int sl_search_no_cleanup_succs(skiplist_t* sl, skey_t key, volatile node_t** right_nodes) {
+int sl_search_no_cleanup_succs(skiplist_t* sl, skey_t key, volatile node_t** right_nodes, linkcache_t* buffer) {
     int i;
     volatile node_t *left;
     volatile node_t* right = NULL;
     volatile node_t* left_next;
+    volatile node_t* lpred;
 
     left = (*sl);
+    lpred = (*sl);
     for (i = max_level - 1; i >= 0; i--) {
         left_next = UNMARKED_PTR_ALL(left->next[i]);
         right = left_next;
@@ -256,16 +273,25 @@ int sl_search_no_cleanup_succs(skiplist_t* sl, skey_t key, volatile node_t** rig
                 if (right->key >= key) {
                     break;
                 }
+                lpred = left;
                 left = right;
             }
             right = UNMARKED_PTR_ALL(right->next[i]);
         }
         right_nodes[i] = right;
     }
-#ifndef BUFFERING_ON
-    if (right->key != key) {
+
+#ifdef BUFFERING_ON
+        //even if key is not found, we still need to scan; a change deleting a node with the serached key might be buffered
+        if (buffer != NULL) {
+            cache_scan(buffer, left->key);
+            cache_scan(buffer, key);
+        }
+#else
+    //if (right->key != key) {
         flush_and_try_unflag((PVOID*)&(left->next[0]));
-    }
+        flush_and_try_unflag((PVOID*)&(lpred->next[0]));
+    //}
 #endif // !BUFFERING_ON
 
 
@@ -325,7 +351,7 @@ svalue_t skiplist_remove(skiplist_t* sl, skey_t key, EpochThread epoch, linkcach
 
     //fprintf(stderr, "in rmove\n");
     EpochStart(epoch);
-    int found = sl_search_no_cleanup_succs(sl, key, successors);
+    int found = sl_search_no_cleanup_succs(sl, key, successors, buffer);
 
     //fprintf(stderr, "in rmove 2\n");
     if (!found) {
@@ -370,7 +396,7 @@ int skiplist_insert(skiplist_t* sl, skey_t key, svalue_t val, EpochThread epoch,
 
     EpochStart(epoch);
 retry:
-    found = sl_search_no_cleanup(sl, key, preds, succs);
+    found = sl_search_no_cleanup(sl, key, preds, succs, buffer);
 
     if (found) {
 #ifdef BUFFERING_ON
