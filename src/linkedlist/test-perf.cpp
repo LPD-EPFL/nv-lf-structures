@@ -17,12 +17,17 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <vector>
+#include <set>
+
+using namespace std;
 
 #include <nv_utils.h>
 
 #include "lf-linkedlist.h"
 
 #define FLUSH_CACHES 1
+
 
 
 /* ################################################################### *
@@ -48,6 +53,7 @@
  * GLOBALS
  * ################################################################### */
 
+barrier_t barrier, barrier_global;
 RETRY_STATS_VARS_GLOBAL;
 
 size_t initial = DEFAULT_INITIAL;
@@ -84,12 +90,81 @@ volatile ticks *removing_count;
 volatile ticks *removing_count_succ;
 volatile ticks *total;
 
+#ifdef ESTIMATE_RECOVERY
+#define MULTITHREADED_RECOVERY 1
+#define RECOVERY_THREADS 48
+typedef struct rec_thread_info_t{
+    uint32_t id;
+    size_t size;
+    size_t rec_threads;
+    size_t page_size;
+    DS_TYPE* set; 
+    ticks time;
+} rec_thread_info_t;
+std::set<void*> unique_pages;
+std::vector<void*> page_vector;
+
+void*
+rec(void* thread) 
+{
+  //pthread_exit(NULL);
+  rec_thread_info_t* td = (rec_thread_info_t*) thread;
+  uint32_t ID = td->id;
+  size_t rec_threads = td->rec_threads;
+  size_t size = td->size;
+  size_t page_size = td->page_size;
+  ticks duration;
+  DS_TYPE* set = td->set;
+  size_t i = ID;
+  size_t k;
+  size_t nodes_per_page;
+
+  //fprintf(stderr, "thread %d, total size %lu\n", ID, size);
+#ifdef FLUSH_CACHES
+#define NUM_EL 8388608
+    volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
+
+    for (k = 0; k < NUM_EL; k++) {
+       elms[i] = i;
+    }
+#endif
+
+  barrier_cross(&barrier_global);
+
+  volatile ticks corr = getticks_correction_calc();
+  ticks startCycles = getticks();
+
+  while (i < size) {
+	void * crt_address = page_vector[i]; 
+	nodes_per_page = page_size / sizeof(DS_NODE);
+	for (k = 0; k < nodes_per_page; k++) {
+        void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
+		if (!NodeMemoryIsFree(node_address)) {
+			if (!is_reachable(set, node_address)) {
+                MarkNodeMemoryAsFree(node_address); 
+            }
+        }
+    }
+    
+    i+= rec_threads;
+  }
+  //DO RECOVERY
+  ticks endCycles = getticks();
+
+  duration = endCycles - startCycles + corr;
+  td->time = duration;
+
+  barrier_cross(&barrier);
+  //fprintf(stderr, "recovery took %llu\n", duration);
+  pthread_exit(NULL);
+
+}
+#endif
 
 /* ################################################################### *
  * LOCALS
  * ################################################################### */
 
-barrier_t barrier, barrier_global;
 
 typedef struct thread_data
 {
@@ -513,13 +588,81 @@ main(int argc, char **argv)
 #ifdef DO_STATS
 		fprintf(stderr, "marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
 #endif
+#ifdef MULTITHREADED_RECOVERY
+        size_t num_pages = page_tables[i]->last_in_use;
+        for (size_t j = 0;  j<num_pages; j++) {
+            unique_pages.insert(page_tables[i]->pages[j].page);
+        }
+#endif
 	}
+
 	//page_tables[num_threads] = (active_page_table_t*)GetOpaquePageBuffer(epoch);
 	//fprintf(stderr, "page table %d has %u pages\n", args->threadCount, page_buffers[args->threadCount]->current_size);
 //#ifdef DO_STATS
 	//fprintf(stderr, "marks %u, hits %u\n", page_buffers[args->threadCount]->num_marks, page_buffers[args->threadCount]->hits);
 //#endif
 
+
+#ifdef MULTITHREADED_RECOVERY
+    page_vector = std::vector<void*>(unique_pages.begin(), unique_pages.end());
+    size_t pg_size= page_tables[0]->page_size; //assuming one size pages
+    size_t total_pages = page_vector.size();
+
+    int num_rec_threads=RECOVERY_THREADS;
+    if (total_pages < num_rec_threads) {
+        num_rec_threads = total_pages;
+    }
+
+
+  barrier_init(&barrier_global, num_rec_threads + 1);
+  barrier_init(&barrier, num_rec_threads);
+
+  pthread_t rec_threads[num_rec_threads];
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    
+  rec_thread_info_t* rtds = (rec_thread_info_t*) malloc(num_rec_threads * sizeof(rec_thread_info_t));
+
+
+  //size_t t;
+  for(t = 0; t < num_rec_threads; t++)
+    {
+      rtds[t].id = t;
+      rtds[t].size = total_pages;
+      rtds[t].rec_threads = num_rec_threads;
+      rtds[t].set = set; 
+      rtds[t].page_size = pg_size;
+      rc = pthread_create(&rec_threads[t], &attr, rec, rtds + t);
+      if (rc)
+	{
+	  printf("ERROR; return code from pthread_create() is %d\n", rc);
+	  exit(-1);
+	}
+        
+    }
+   MEM_BARRIER;
+  barrier_cross(&barrier_global);
+
+  for(t = 0; t < num_rec_threads; t++) 
+    {
+      rc = pthread_join(rec_threads[t], &status);
+      if (rc) 
+	{
+	  printf("ERROR; return code from pthread_join() is %d\n", rc);
+	  exit(-1);
+	}
+    }
+
+    ticks max_duration = 0;
+    for(t = 0; t < num_rec_threads; t++)
+    {
+        if (rtds[t].time > max_duration) { 
+             max_duration = rtds[t].time;
+        }
+    }
+
+	printf("    Recovery takes (cycles): %llu\n", max_duration);
+#else 
 
 #ifdef FLUSH_CACHES
 #define NUM_EL 8388608
@@ -548,6 +691,7 @@ main(int argc, char **argv)
 	active_page_table_t* pb = create_active_page_table(num_threads);
 
 	SetOpaquePageBuffer(epoch, pb);
+#endif
 #else
   EpochThreadShutdown(epoch);
 #endif
@@ -595,15 +739,18 @@ main(int argc, char **argv)
 
   RETRY_STATS_PRINT(total, putting_count_total, removing_count_total, putting_count_total_succ + removing_count_total_succ);    
     
-
+#ifndef MULTITHREADED_RECOVERY
 	printf("    Recovery takes (cycles): %llu\n", (LLU)recovery_cycles);
+#endif
 
     DS_DELETE(set);
 #ifdef ESTIMATE_RECOVERY
     destroy_active_page_table((active_page_table_t*)GetOpaquePageBuffer(epoch));
 
 #ifdef FLUSH_CACHES
+#ifndef MULTITHREADED_RECOVERY
     free((void*)elms);
+#endif
 #endif
 #endif
 
