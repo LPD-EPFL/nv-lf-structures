@@ -174,7 +174,7 @@ retry:
                 goto retry;
             }
             if (left_next!=right) {
-                write_data_nowait(&(left->next[i]), 1);
+                write_data_nowait((void*)&(left->next[i]), 1);
             }
         }
         else {

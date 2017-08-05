@@ -49,7 +49,7 @@ Please cite our PPoPP 2014 paper - Fast Concurrent Lock-Free Binary Search Trees
  */
 
 #define PREPROCESSING 0
-#define ESTIMATE_RECOVERY 1
+//#define ESTIMATE_RECOVERY 1
 #define FLUSH_CACHES 1
 
 #define RO                              1

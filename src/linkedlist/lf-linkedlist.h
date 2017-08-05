@@ -44,4 +44,21 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
 
 int linkedlist_size(linkedlist_t* ll);
 
+static inline UINT_PTR unmarked_ptr(UINT_PTR p) {
+	return(p & ~(UINT_PTR)0x01);
+}
+
+#define UNMARKED_PTR(p) (node_t*)unmarked_ptr((UINT_PTR) p)
+
+static inline UINT_PTR marked_ptr(UINT_PTR p) {
+	return (p | (UINT_PTR)0x01);
+}
+
+#define MARKED_PTR(p) (node_t*)marked_ptr((UINT_PTR) p)
+
+static inline int ptr_is_marked(UINT_PTR p) {
+	return (int)(p & (UINT_PTR)0x01);
+}
+
+#define PTR_IS_MARKED(p) ptr_is_marked((UINT_PTR) p)
 #endif
