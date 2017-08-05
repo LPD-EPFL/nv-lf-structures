@@ -61,4 +61,11 @@ static inline int ptr_is_marked(UINT_PTR p) {
 }
 
 #define PTR_IS_MARKED(p) ptr_is_marked((UINT_PTR) p)
+
+static inline UINT_PTR unmarked_ptr_all(UINT_PTR p) {
+    return(p & ~(UINT_PTR)0x07);
+}
+
+#define UNMARKED_PTR_ALL(p) (node_t*)unmarked_ptr_all((UINT_PTR) p)
+
 #endif

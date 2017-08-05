@@ -19,6 +19,7 @@
 #include <malloc.h>
 #include <vector>
 #include <set>
+#include <unordered_set>
 
 using namespace std;
 
@@ -140,7 +141,7 @@ rec(void* thread)
   ticks startCycles = getticks();
 
 #ifdef RECOVERY_V2
- void* node_address;
+ void* node_address = NULL;
   while (i < size) {
 	void * crt_address = page_vector[i]; 
 	nodes_per_page = page_size / sizeof(DS_NODE);
@@ -154,13 +155,13 @@ rec(void* thread)
     i+= rec_threads;
   }
 
-    volatile node_t* node = UNMARKED_PTR((*set)->next);
+    volatile node_t* node = UNMARKED_PTR_ALL((*set)->next);
     allocated.erase((void*)node);
 	while (node->next != NULL) {
         allocated.erase((void*)node);
-		node = UNMARKED_PTR(node->next);
+		node = UNMARKED_PTR_ALL(node->next);
 	}
-	std::set<void*>::iterator it;
+	std::unordered_set<void*>::iterator it;
 
 	for (it = allocated.begin(); it != allocated.end(); ++it)
 	{

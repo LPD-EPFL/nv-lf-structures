@@ -240,7 +240,7 @@ endif
 # Global settings
 #################
 
-CFLAGS += -Wall
+CFLAGS += -Wall -std=c++11
 CFLAGS += -fno-strict-aliasing
 CFLAGS += -I$(LIBAO_INC) -I$(ROOT)/include -I$(LIBSSMEM)/include
 
