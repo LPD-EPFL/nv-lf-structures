@@ -285,6 +285,7 @@ int perform_one_delete_window_operation(thread_data_t* data, seekRecord_t * R, u
 typedef struct rec_thread_info_t{
     uint32_t id;
     size_t size;
+    unsigned int seed;
     size_t rec_threads;
     size_t page_size;
     node_t* root; 
@@ -302,6 +303,7 @@ rec(void* thread)
   uint32_t ID = td->id;
   size_t rec_threads = td->rec_threads;
   size_t size = td->size;
+  unsigned int seed = td->seed;
   size_t page_size = td->page_size;
   ticks duration;
   node_t* root = td->root;
@@ -314,8 +316,11 @@ rec(void* thread)
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
 
+    size_t el;
     for (k = 0; k < NUM_EL; k++) {
-       elms[i] = i;
+      el = rand_r(&seed) % (NUM_EL);
+      //el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
+       elms[el] = el+2;
     }
 #endif
 
@@ -935,6 +940,7 @@ node_t * newRT = new node_t;
     {
       rtds[thr].id = thr;
       rtds[thr].size = total_pages;
+      rtds[thr].seed = rand();
       rtds[thr].rec_threads = num_rec_threads;
       rtds[thr].root = newRT; 
       rtds[thr].page_size = pg_size;
@@ -974,8 +980,11 @@ node_t * newRT = new node_t;
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
 
-    for (i = 0; i < NUM_EL; i++) {
-       elms[i] = i;
+    size_t el;
+    for (k = 0; k < NUM_EL; k++) {
+      el = rand_r(&seed) % (NUM_EL);
+      //el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
+       elms[el] = el+2;
     }
 #endif
 

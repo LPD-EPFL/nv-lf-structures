@@ -127,8 +127,11 @@ rec(void* thread)
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
 
+  seeds = seed_rand();
+    size_t el;
     for (k = 0; k < NUM_EL; k++) {
-       elms[i] = i;
+      el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
+       elms[el] = el+2;
     }
 #endif
 
@@ -703,8 +706,11 @@ main(int argc, char **argv)
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
 
-    for (i = 0; i < NUM_EL; i++) {
-       elms[i] = i;
+  seeds = seed_rand();
+    size_t el;
+    for (k = 0; k < NUM_EL; k++) {
+      el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
+       elms[el] = el+2;
     }
 #endif
 
