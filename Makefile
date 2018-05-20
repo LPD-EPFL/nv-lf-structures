@@ -7,7 +7,7 @@ LBS = src/linkedlist-lazy src/hashtable-lazy
 
 default: linkedlist skiplist bst-aravind hashtable linkedlist-lazy hashtable-lazy $(LFS) $(LBS)
 
-all:	linkedlist skiplist bst-aravind hashtable linkedlist-lazy hashtable-lazy $(LFS) $(LBS)
+all:	linkedlist skiplist bst-aravind hashtable linkedlist-lazy hashtable-lazy bst-tk skiplist-herlihy-lb $(LFS) $(LBS)
 
 
 linkedlist:
@@ -22,8 +22,14 @@ hashtable-lazy:
 skiplist:
 	$(MAKE) -B -C src/skiplist
 
+skiplist-herlihy-lb:
+	$(MAKE) -B -C src/skiplist-herlihy-lb
+
 bst:
 	$(MAKE) -B -C src/bst
+
+bst-tk:
+	$(MAKE) -B -C src/bst-tk
 
 bst-aravind:
 	$(MAKE) -B -C src/bst-aravind
