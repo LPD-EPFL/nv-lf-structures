@@ -19,6 +19,7 @@
 #include <malloc.h>
 #include <vector>
 #include <set>
+#include <unordered_set>
 
 using namespace std;
 
@@ -92,6 +93,7 @@ volatile ticks *total;
 
 #ifdef ESTIMATE_RECOVERY
 #define MULTITHREADED_RECOVERY 1
+#define RECOVERY_V2 1
 #define RECOVERY_THREADS 48
 typedef struct rec_thread_info_t{
     uint32_t id;
@@ -118,22 +120,58 @@ rec(void* thread)
   size_t i = ID;
   size_t k;
   size_t nodes_per_page;
+  volatile ticks corr = getticks_correction_calc();
 
   //fprintf(stderr, "thread %d, total size %lu\n", ID, size);
 #ifdef FLUSH_CACHES
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
 
+  seeds = seed_rand();
+    size_t el;
     for (k = 0; k < NUM_EL; k++) {
-       elms[i] = i;
+      el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
+       elms[el] = el+2;
     }
+#endif
+
+#ifdef RECOVERY_V2
+    std::unordered_set<void*> allocated;
 #endif
 
   barrier_cross(&barrier_global);
 
-  volatile ticks corr = getticks_correction_calc();
   ticks startCycles = getticks();
 
+#ifdef RECOVERY_V2
+ void* node_address = NULL;
+  while (i < size) {
+	void * crt_address = page_vector[i]; 
+	nodes_per_page = page_size / sizeof(DS_NODE);
+	for (k = 0; k < nodes_per_page; k++) {
+        node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
+		if (!NodeMemoryIsFree(node_address)) {
+            allocated.insert(node_address);
+        }
+    }
+    
+    i+= rec_threads;
+  }
+
+    volatile node_t* node = UNMARKED_PTR_ALL((*set)->next);
+    allocated.erase((void*)node);
+	while (node->next != NULL) {
+        allocated.erase((void*)node);
+		node = UNMARKED_PTR_ALL(node->next);
+	}
+	std::unordered_set<void*>::iterator it;
+
+	for (it = allocated.begin(); it != allocated.end(); ++it)
+	{
+		node_address  = *it; 
+	} 
+    MarkNodeMemoryAsFree(node_address); 
+#else
   while (i < size) {
 	void * crt_address = page_vector[i]; 
 	nodes_per_page = page_size / sizeof(DS_NODE);
@@ -148,7 +186,7 @@ rec(void* thread)
     
     i+= rec_threads;
   }
-  //DO RECOVERY
+#endif
   ticks endCycles = getticks();
 
   duration = endCycles - startCycles + corr;
@@ -584,9 +622,9 @@ main(int argc, char **argv)
   nanosleep(&timeout, NULL);
 	for (ULONG i = 0; i < num_threads; i++) {
 		page_tables[i] = tds[i].page_table;
-		fprintf(stderr, "page table %d has %u pages\n", i, page_tables[i]->current_size);
+		printf("page table %d has %u pages\n", i, page_tables[i]->current_size);
 #ifdef DO_STATS
-		fprintf(stderr, "marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
+		printf("marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
 #endif
 #ifdef MULTITHREADED_RECOVERY
         size_t num_pages = page_tables[i]->last_in_use;
@@ -668,8 +706,11 @@ main(int argc, char **argv)
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
 
-    for (i = 0; i < NUM_EL; i++) {
-       elms[i] = i;
+  seeds = seed_rand();
+    size_t el;
+    for (k = 0; k < NUM_EL; k++) {
+      el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
+       elms[el] = el+2;
     }
 #endif
 
