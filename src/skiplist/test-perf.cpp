@@ -90,7 +90,7 @@ volatile ticks *total;
 
 #ifdef ESTIMATE_RECOVERY
 #define MULTITHREADED_RECOVERY 1
-#define RECOVERY_THREADS 48
+#define RECOVERY_THREADS 1
 typedef struct rec_thread_info_t{
     uint32_t id;
     size_t size;
@@ -131,6 +131,8 @@ rec(void* thread)
     }
 #endif
 
+  size_t all = CACHE_LINES_PER_NV_NODE * CACHE_LINE_SIZE;
+  assert(all >= sizeof(DS_NODE));
   barrier_cross(&barrier_global);
 
   volatile ticks corr = getticks_correction_calc();
@@ -138,10 +140,10 @@ rec(void* thread)
 
   while (i < size) {
 	void * crt_address = page_vector[i]; 
-	nodes_per_page = page_size / sizeof(DS_NODE);
+	nodes_per_page = page_size / all;
 	for (k = 0; k < nodes_per_page; k++) {
-        void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
-		if (!NodeMemoryIsFree(node_address)) {
+        void * node_address = (void*)((UINT_PTR)crt_address + (all*k));
+		if (!DSNodeMemoryIsFree(node_address, all)) {
 			if (!is_reachable(set, node_address)) {
                 MarkNodeMemoryAsFree(node_address); 
             }
@@ -668,7 +670,7 @@ main(int argc, char **argv)
 
   seeds = seed_rand();
     size_t el;
-    for (k = 0; k < NUM_EL; k++) {
+    for (size_t k = 0; k < NUM_EL; k++) {
       el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
        elms[el] = el+2;
     }

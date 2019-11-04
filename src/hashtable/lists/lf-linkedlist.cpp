@@ -329,7 +329,7 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 // 			write_data_wait(unlinking_address, 1);
 // 			prev->next = next;
 // 			write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);	
-// 			if (!NodeMemoryIsFree((void*)node)) {
+// 			if (!DSNodeMemoryIsFree((void*)node)) {
 // 				finalize_node((void*)node, NULL, NULL);
 // 			}
 // 			node = prev->next;
@@ -362,16 +362,16 @@ svalue_t linkedlist_find(linkedlist_t* ll, skey_t key, EpochThread epoch, linkca
 // 					nodes_per_page = page_size / sizeof(node_t);
 // 					for (k = 0; k < nodes_per_page; k++) {
 // 						void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
-// 						if (!NodeMemoryIsFree(node_address)) {
+// 						if (!DSNodeMemoryIsFree(node_address)) {
 // 							if (!is_reachable(ll, node_address)) {
-// 				//				if (NodeMemoryIsFree(node_address)) {
+// 				//				if (DSNodeMemoryIsFree(node_address)) {
 // 									//this should never happen in this structure - since we remove marked nodes
 // 				//					fprintf(stderr, "error: reachable node whose memory was free\n");
 // 									//MarkNodeMemoryAsAllocated(node_address); //if a node is reachable but its memory is marked as free, need to mark that memory as allocated
 // 				//				}
 // 			//				}
 // 				//			else {
-// 				//				if (!NodeMemoryIsFree(node_address)) {
+// 				//				if (!DSNodeMemoryIsFree(node_address)) {
 // 									MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
 // 				//				}
 // 							}

@@ -93,7 +93,7 @@ volatile ticks *total;
 
 #ifdef ESTIMATE_RECOVERY
 #define MULTITHREADED_RECOVERY 1
-#define RECOVERY_THREADS 48
+  #define RECOVERY_THREADS 1
 typedef struct rec_thread_info_t{
     uint32_t id;
     size_t size;
@@ -108,6 +108,8 @@ std::vector<void*> page_vector;
 void*
 rec(void* thread) 
 {
+
+  FlushThread();
   //pthread_exit(NULL);
   rec_thread_info_t* td = (rec_thread_info_t*) thread;
   uint32_t ID = td->id;
@@ -120,7 +122,7 @@ rec(void* thread)
   size_t k;
   size_t nodes_per_page;
 
-  //fprintf(stderr, "thread %d, total size %lu\n", ID, size);
+  size_t all = CACHE_LINES_PER_NV_NODE * CACHE_LINE_SIZE;
 #ifdef FLUSH_CACHES
 #define NUM_EL 8388608
     volatile uint64_t* elms = (volatile uint64_t*) malloc (NUM_EL*sizeof(uint64_t));
@@ -139,12 +141,15 @@ rec(void* thread)
   volatile ticks corr = getticks_correction_calc();
   ticks startCycles = getticks();
 
+  assert(all >= sizeof(DS_NODE));
+	nodes_per_page = page_size / all;
+
+
   while (i < size) {
 	void * crt_address = page_vector[i]; 
-	nodes_per_page = page_size / sizeof(DS_NODE);
 	for (k = 0; k < nodes_per_page; k++) {
-        void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
-		if (!NodeMemoryIsFree(node_address)) {
+        void * node_address = (void*)((UINT_PTR)crt_address + (all*k));
+		if (!DSNodeMemoryIsFree(node_address, all)) {
 			if (!is_reachable(set, node_address)) {
                 MarkNodeMemoryAsFree(node_address); 
             }
@@ -591,9 +596,9 @@ main(int argc, char **argv)
 	active_page_table_t** page_tables = (active_page_table_t**)malloc(sizeof(active_page_table_t*) * (num_threads));
 	for (ULONG i = 0; i < num_threads; i++) {
 		page_tables[i] = tds[i].page_table;
-		fprintf(stderr, "page table %d has %u pages\n", i, page_tables[i]->current_size);
+		// fprintf(stderr, "page table %d has %u pages\n", i, page_tables[i]->current_size);
 #ifdef DO_STATS
-		fprintf(stderr, "marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
+		// fprintf(stderr, "marks %u, hits %u\n", page_tables[i]->num_marks, page_tables[i]->hits);
 #endif
 #ifdef MULTITHREADED_RECOVERY
         size_t num_pages = page_tables[i]->last_in_use;
@@ -613,6 +618,7 @@ main(int argc, char **argv)
 #ifdef MULTITHREADED_RECOVERY
     page_vector = std::vector<void*>(unique_pages.begin(), unique_pages.end());
     size_t pg_size= page_tables[0]->page_size; //assuming one size pages
+    // fprintf(stderr,"Recovering pages of size %u\n", pg_size);
     size_t total_pages = page_vector.size();
 
     int num_rec_threads=RECOVERY_THREADS;
@@ -639,6 +645,7 @@ main(int argc, char **argv)
       rtds[t].rec_threads = num_rec_threads;
       rtds[t].set = set; 
       rtds[t].page_size = pg_size;
+      MEM_BARRIER;
       rc = pthread_create(&rec_threads[t], &attr, rec, rtds + t);
       if (rc)
 	{
@@ -677,7 +684,7 @@ main(int argc, char **argv)
 
   seeds = seed_rand();
     size_t el;
-    for (k = 0; k < NUM_EL; k++) {
+    for (size_t k = 0; k < NUM_EL; k++) {
       el = (my_random(&(seeds[0]), &(seeds[1]), &(seeds[2])) % (NUM_EL - 1));
        elms[el] = el+2;
     }

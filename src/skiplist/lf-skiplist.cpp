@@ -540,11 +540,36 @@ retry:
     int is_reachable(skiplist_t* sl, void* address) {
         //by the point we call is_reachable, we assume the skip-list has been brought to a consistent state
         //hence, we can do searches with logarithmic complexity instead of traversing the bottom layer 
+        address = UNMARKED_PTR_ALL(address);
 
         skey_t key = ((node_t*)address)->key;
-        node_t* left = sl_left_search(sl, key, NULL);
+            if ((address == (void*)(*sl)) || (key==MAX_KEY))return 1; //the left search won't find the sentinels, so they would get deleted
 
-        if ((left->key == key) && ((void*)left == address)) {
+//---
+
+        node_t * left = NULL;
+        volatile node_t* left_prev;
+
+        left_prev = UNMARKED_PTR_ALL(*sl);
+
+        int level;
+        for (level = max_level - 1; level >= 0; level--) {
+            left = UNMARKED_PTR_ALL(left_prev->next[level]);
+            while (left->key < key) {
+                left_prev = left;
+                left = UNMARKED_PTR_ALL(left->next[level]);
+            }
+            if (left->key == key) {
+                break;
+            }
+        }
+//---
+
+
+        //node_t* left = sl_left_search(sl, key, NULL);
+
+        left=UNMARKED_PTR_ALL(left);
+        if (((void*)left == address) && (left->key == key)){
             return 1;
         }
         return 0;
@@ -644,7 +669,7 @@ retry:
                 //write_data_nowait((void*)node, CACHE_LINES_PER_NV_NODE);
                 //no concurrency, can just delete the node;
                 //no need to go through the epoch-based reclamation scheme	
-                if (!NodeMemoryIsFree((void*)node)) {
+                if (!DSNodeMemoryIsFree((void*)node, sizeof(node_t))) {
                     sl_finalize_node((void*)node, NULL, NULL);
                 }
             }
@@ -664,6 +689,8 @@ retry:
         page_descriptor_t* crt;
         size_t num_pages;
         //fprintf(stderr, "size of node is %lu\n",sizeof(node_t));
+        size_t all = CACHE_LINES_PER_NV_NODE * CACHE_LINE_SIZE;
+        assert(all >= sizeof(node_t));
 
         for (i = 0; i < num_page_buffers; i++) {
             page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
@@ -672,10 +699,10 @@ retry:
             for (j = 0; j < num_pages; j++) {
                 if (crt[j].page != NULL) {
                     void * crt_address = crt[j].page;
-                    nodes_per_page = page_size / sizeof(node_t);
+                    nodes_per_page = page_size / all;
                     for (k = 0; k < nodes_per_page; k++) {
-                        void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
-                        if (!NodeMemoryIsFree(node_address)) {
+                        void * node_address = (void*)((UINT_PTR)crt_address + (all*k));
+                        if (!DSNodeMemoryIsFree(node_address, all)) {
                             if (!is_reachable(sl, node_address)) {
                                 //if (NodeMemoryIsFree(node_address)) {
                                 //this should never happen in this structure - since we remove marked nodes just before

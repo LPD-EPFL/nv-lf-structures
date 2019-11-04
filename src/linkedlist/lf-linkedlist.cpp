@@ -301,7 +301,7 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
 			//write_data_wait(unlinking_address, 1);
 			//prev->next = next;
 			//write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);	
-			//if (!NodeMemoryIsFree((void*)node)) {
+			//if (!DSNodeMemoryIsFree((void*)node)) {
 				//finalize_node((void*)node, NULL, NULL);
 			//}
 			//node = prev->next;
@@ -324,6 +324,8 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
 	page_descriptor_t* crt;
     size_t num_pages;
 
+  uint64_t all_size = CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE;
+  assert(all_size >= sizeof(node_t));
 	for (i = 0; i < num_page_buffers; i++) {
         //fprintf(stderr, "apt %d\n", i);
 		page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
@@ -335,20 +337,20 @@ void recover(linkedlist_t* ll, active_page_table_t** page_buffers, int num_page_
 					nodes_per_page = page_size / sizeof(node_t);
 					for (k = 0; k < nodes_per_page; k++) {
 						//void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
-                        void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
-						if (!NodeMemoryIsFree(node_address)) {
+                        void * node_address = (void*)((UINT_PTR)crt_address + (all_size*k));
+						if (!DSNodeMemoryIsFree(node_address, all_size)) {
                             //assert(((uintptr_t)node_address % 64) == 0);
                             //if(node_address == (void*)node) fprintf(stderr, "next1\n");
 							if (!is_reachable(ll, node_address)) {
                             //if(node_address == (void*)node) fprintf(stderr, "next2\n");
-				//				if (NodeMemoryIsFree(node_address)) {
+				//				if (DSNodeMemoryIsFree(node_address)) {
 									//this should never happen in this structure - since we remove marked nodes
 				//					fprintf(stderr, "error: reachable node whose memory was free\n");
 									//MarkNodeMemoryAsAllocated(node_address); //if a node is reachable but its memory is marked as free, need to mark that memory as allocated
 				//				}
 			//				}
 				//			else {
-				//				if (!NodeMemoryIsFree(node_address)) {
+				//				if (!DSNodeMemoryIsFree(node_address)) {
 									MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
 				//				}
 							}

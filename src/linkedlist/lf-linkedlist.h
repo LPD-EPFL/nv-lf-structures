@@ -5,6 +5,7 @@
  */
 
 #include <link-cache.h>
+#include <assert.h>
 #include <active-page-table.h>
 #include <nv_memory.h>
 #include <nv_utils.h>

@@ -46,20 +46,28 @@ ht_remove(ht_intset_t *set, skey_t key, EpochThread epoch, linkcache_t* buffer)
 }
 
 int is_reachable(ht_intset_t* ht, void* address) {
+    address = UNMARKED_PTR(address);
     skey_t key = ((node_t*) address)->key;
     int addr = key & ht->hash;
     linkedlist_t* ll = &ht->buckets[addr];
 
+    if ((key == MAX_KEY) || (address == (void*)(*ll))) return 1; //if searching for right sentinel, return 1 -- the following traversal stops before that
     volatile node_t* prev = (*ll);
     volatile node_t* node = (node_t*)unmark_ptr_cache((uintptr_t)(*ll)->next);
+        node= (volatile node_t*)UNMARKED_PTR((UINT_PTR)node);
     
+    // while ((node != NULL) && (node->key < key)) {
     while (node->key < key) {
         prev = node;
         node = UNMARKED_PTR(node->next);
         node= (volatile node_t*)unmark_ptr_cache((UINT_PTR)node);
     }
+
+    // if (node == NULL) {
+    //     return 0;
+    // }
     
-    if ((node->key == key) && ((void*)node == address)) {
+    if (((void*)node == address) && (node->key == key)) {
         return 1;
     }
     return 0;
@@ -94,7 +102,7 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
                 //write_data_wait(unlinking_address, 1);
                 //prev->next = next;
                 //write_data_wait((void*)prev, CACHE_LINES_PER_NV_NODE);  
-                //if (!NodeMemoryIsFree((void*)node)) {
+                //if (!DSNodeMemoryIsFree((void*)node)) {
                     //finalize_node((void*)node, NULL, NULL);
                 //}
                 //node = prev->next;
@@ -117,6 +125,8 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
     size_t num_pages;
 
     //fprintf(stderr, "recovery going over pages\n");
+    size_t all = CACHE_LINES_PER_NV_NODE * CACHE_LINE_SIZE;
+    assert(all >= sizeof(node_t));
 
     for (i = 0; i < num_page_buffers; i++) {
         //fprintf(stderr, "going over page table %d\n",i);
@@ -126,10 +136,10 @@ void recover(ht_intset_t* ht, active_page_table_t** page_buffers, int num_page_b
         for (j = 0; j < num_pages; j++) {
             if (crt[j].page != NULL) {
                 void * crt_address = crt[j].page;
-                nodes_per_page = page_size / sizeof(node_t);
+                nodes_per_page = page_size / all;
                 for (k = 0; k < nodes_per_page; k++) {
-                    void * node_address = (void*)((UINT_PTR)crt_address + (CACHE_LINES_PER_NV_NODE*CACHE_LINE_SIZE*k));
-                    if (!NodeMemoryIsFree(node_address)) {
+                    void * node_address = (void*)((UINT_PTR)crt_address + (all*k));
+                    if (!DSNodeMemoryIsFree(node_address, all)) {
                         if (!is_reachable(ht, node_address)) {
     
                             MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node

@@ -3,6 +3,7 @@
 #include <nv_memory.h>
 #include <nv_utils.h>
 #include <epoch.h>
+#include <assert.h>
 
 #define CACHE_LINES_PER_NV_NODE 1 
 
@@ -561,6 +562,9 @@ void recover(thread_data_t * data, active_page_table_t** page_buffers, int num_p
     page_descriptor_t* crt;
     size_t num_pages;
 
+    size_t all = CACHE_LINES_PER_NV_NODE * CACHE_LINE_SIZE;
+    assert (all >= sizeof(node_t));
+
     for (i = 0; i < num_page_buffers; i++) {
         page_size = page_buffers[i]->page_size; //TODO: now assuming all the pages in the buffer have one size; change this? (given that in the NV heap we basically just use one page size (except the bottom level), should be fine)
         num_pages = page_buffers[i]->last_in_use;
@@ -568,10 +572,10 @@ void recover(thread_data_t * data, active_page_table_t** page_buffers, int num_p
         for (j = 0; j < num_pages; j++) {
                 if (crt[j].page != NULL) {
                     void * crt_address = crt[j].page;
-                    nodes_per_page = page_size / sizeof(node_t);
+                    nodes_per_page = page_size / all; 
                     for (k = 0; k < nodes_per_page; k++) {
-                        void * node_address = (void*)((UINT_PTR)crt_address + (sizeof(node_t)*k));
-                        if (!NodeMemoryIsFree(node_address)) {
+                        void * node_address = (void*)((UINT_PTR)crt_address + (all*k));
+                        if (!DSNodeMemoryIsFree(node_address,all)) {
                             if (!is_reachable(data->rootOfTree, node_address)) {
 
                                 MarkNodeMemoryAsFree(node_address); //if a node is not reachable but its memory is marked as allocated, need to free the node
